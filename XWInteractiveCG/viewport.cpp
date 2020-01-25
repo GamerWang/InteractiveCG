@@ -42,7 +42,14 @@ void GlutKeyboard(unsigned char key, int x, int y);
 
 //-------------------------------------------------------------------------------
 
+void SendDataToOpenGL();
+
+//-------------------------------------------------------------------------------
+
 void ShowViewport() {
+	glewInit();
+
+	// basic settings for the viewport
 	int argc = 1;
 	char argstr[] = "canvas";
 	char* argv = argstr;
@@ -58,6 +65,11 @@ void ShowViewport() {
 
 	bgColor = new Vec3f(.985f, .278f, .157f);
 	glClearColor(bgColor->x, bgColor->y, bgColor->z, 0);
+
+	// prepare data for opengl
+	SendDataToOpenGL();
+
+	// install shaders to opengl
 
 	glutMainLoop();
 }
@@ -95,6 +107,12 @@ void GlutKeyboard(unsigned char key, int x, int y) {
 	default:
 		break;
 	}
+}
+
+//-------------------------------------------------------------------------------
+
+void SendDataToOpenGL() {
+	printf("Send!\n");
 }
 
 //-------------------------------------------------------------------------------
