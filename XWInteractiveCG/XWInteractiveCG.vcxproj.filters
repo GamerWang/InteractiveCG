@@ -19,6 +19,12 @@
     <Filter Include="Source Files\Programs\cyClasses">
       <UniqueIdentifier>{65bfb2b5-2e78-4d0c-b062-c1a6e71b9665}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Data">
+      <UniqueIdentifier>{620b83b0-7aa8-475e-854a-850f3acfe3a4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Data\Shaders">
+      <UniqueIdentifier>{4e263a27-45bd-4b32-a782-21d26fa7b69a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -38,5 +44,16 @@
     <ClInclude Include="Programs\cyVector.h">
       <Filter>Source Files\Programs\cyClasses</Filter>
     </ClInclude>
+    <ClInclude Include="Programs\cyTriMesh.h">
+      <Filter>Source Files\Programs\cyClasses</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Data\VertexShader.glsl">
+      <Filter>Source Files\Data\Shaders</Filter>
+    </None>
+    <None Include="Data\FragmentShader.glsl">
+      <Filter>Source Files\Data\Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

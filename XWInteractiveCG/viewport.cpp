@@ -15,6 +15,10 @@
 #include "cyVector.h";
 using namespace cy;
 
+//-------------------------------------------------------------------------------
+
+# include <GL/glew.h>
+
 #ifdef USE_GLUT
 # ifdef __APPLE__
 # include <GLUT/glut.h>
@@ -24,6 +28,7 @@ using namespace cy;
 #else
 # include <GL/freeglut.h>
 #endif
+
 
 //-------------------------------------------------------------------------------
 
