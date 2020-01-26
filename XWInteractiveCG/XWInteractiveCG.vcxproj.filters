@@ -35,25 +35,25 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Programs\cyCore.h">
-      <Filter>Source Files\Programs\cyClasses</Filter>
-    </ClInclude>
-    <ClInclude Include="Programs\cyPoint.h">
-      <Filter>Source Files\Programs\cyClasses</Filter>
-    </ClInclude>
-    <ClInclude Include="Programs\cyVector.h">
-      <Filter>Source Files\Programs\cyClasses</Filter>
-    </ClInclude>
-    <ClInclude Include="Programs\cyTriMesh.h">
-      <Filter>Source Files\Programs\cyClasses</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
     <None Include="Data\VertexShader.glsl">
       <Filter>Source Files\Data\Shaders</Filter>
     </None>
     <None Include="Data\FragmentShader.glsl">
       <Filter>Source Files\Data\Shaders</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Programs\cyCore.h">
+      <Filter>Source Files\Programs\cyClasses</Filter>
+    </ClInclude>
+    <ClInclude Include="Programs\cyPoint.h">
+      <Filter>Source Files\Programs\cyClasses</Filter>
+    </ClInclude>
+    <ClInclude Include="Programs\cyTriMesh.h">
+      <Filter>Source Files\Programs\cyClasses</Filter>
+    </ClInclude>
+    <ClInclude Include="Programs\cyVector.h">
+      <Filter>Source Files\Programs\cyClasses</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -78,6 +78,8 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)Middleware\freeglut\include;$(SolutionDir)Middleware\glew-2.1.0\include;$(SolutionDir)$(SolutionName)\Programs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <CompileAs>Default</CompileAs>
+      <DisableSpecificWarnings>4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -86,7 +88,8 @@
     </Link>
     <PostBuildEvent>
       <Command>xcopy $(SolutionDir)Middleware\freeglut\bin\freeglut.dll $(targetDir) /Y
-xcopy $(SolutionDir)Middleware\glew-2.1.0\bin\Release\Win32\glew32.dll $(targetDir) /Y</Command>
+xcopy $(SolutionDir)Middleware\glew-2.1.0\bin\Release\Win32\glew32.dll $(targetDir) /Y
+xcopy $(SolutionDir)$(ProjectName)\Data $(targetDir)Data /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -110,6 +113,8 @@ xcopy $(SolutionDir)Middleware\glew-2.1.0\bin\Release\Win32\glew32.dll $(targetD
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)Middleware\freeglut\include;$(SolutionDir)Middleware\glew-2.1.0\include;$(SolutionDir)$(SolutionName)\Programs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <CompileAs>Default</CompileAs>
+      <DisableSpecificWarnings>4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -120,7 +125,8 @@ xcopy $(SolutionDir)Middleware\glew-2.1.0\bin\Release\Win32\glew32.dll $(targetD
     </Link>
     <PostBuildEvent>
       <Command>xcopy $(SolutionDir)Middleware\freeglut\bin\freeglut.dll $(targetDir) /Y
-xcopy $(SolutionDir)Middleware\glew-2.1.0\bin\Release\Win32\glew32.dll $(targetDir) /Y</Command>
+xcopy $(SolutionDir)Middleware\glew-2.1.0\bin\Release\Win32\glew32.dll $(targetDir) /Y
+xcopy $(SolutionDir)$(ProjectName)\Data $(targetDir)Data /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -143,14 +149,14 @@ xcopy $(SolutionDir)Middleware\glew-2.1.0\bin\Release\Win32\glew32.dll $(targetD
     <ClCompile Include="viewport.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Data\FragmentShader.glsl" />
+    <None Include="Data\VertexShader.glsl" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="Programs\cyCore.h" />
     <ClInclude Include="Programs\cyPoint.h" />
     <ClInclude Include="Programs\cyTriMesh.h" />
     <ClInclude Include="Programs\cyVector.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Data\FragmentShader.glsl" />
-    <None Include="Data\VertexShader.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -9,12 +9,25 @@
 ///
 //-------------------------------------------------------------------------------
 
-void ShowViewport();
+#define default_obj_name "teapot.obj"
+#define enable_default_obj
+
+//-------------------------------------------------------------------------------
+
+void ShowViewport(int argc, char* argv[]);
 
 //-------------------------------------------------------------------------------
 
 int main(int argc, char *argv[]) {
-	ShowViewport();
+#ifdef enable_default_obj
+	if (argc <= 1) {
+		argc = 2;
+		char defaultObjName[] = default_obj_name;
+		argv[1] = defaultObjName;
+	}
+#endif
+
+	ShowViewport(argc, argv);
 	return 0;
 }
 
