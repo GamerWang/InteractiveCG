@@ -154,6 +154,7 @@ xcopy $(SolutionDir)$(ProjectName)\Data $(targetDir)Data /Y</Command>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Programs\cyCore.h" />
+    <ClInclude Include="Programs\cyGL.h" />
     <ClInclude Include="Programs\cyPoint.h" />
     <ClInclude Include="Programs\cyTriMesh.h" />
     <ClInclude Include="Programs\cyVector.h" />

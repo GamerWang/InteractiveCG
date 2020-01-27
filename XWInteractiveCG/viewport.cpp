@@ -8,14 +8,11 @@
 ///	\rendering viewport using openGL & freeglut
 ///
 //-------------------------------------------------------------------------------
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
-
-#include "cyVector.h";
-#include "cyTriMesh.h";
-using namespace cy;
 
 //-------------------------------------------------------------------------------
 
@@ -31,17 +28,29 @@ using namespace cy;
 # include <GL/freeglut.h>
 #endif
 
+//-------------------------------------------------------------------------------
+
+#include "cyVector.h";
+#include "cyTriMesh.h";
+#include "cyGL.h"
+using namespace cy;
 
 //-------------------------------------------------------------------------------
 
 Vec3f* bgColor = nullptr;
 cyTriMesh* targetObject = nullptr;
+char vertexShaderPath[30] = "Data\\VertexShader.glsl";
+char fragmentShaderPath[30] = "Data\\FragmentShader.glsl";
+GLSLShader* vertexShader;
+GLSLShader* fragmentShader;
+GLSLProgram* baseProgram;
 
 //-------------------------------------------------------------------------------
 
 GLuint baseVertexArrayObjectID;
 GLuint baseVertexBufferID;
 GLuint baseIndexBufferID;
+GLuint baseNumIndices;
 
 //-------------------------------------------------------------------------------
 
@@ -52,6 +61,8 @@ void GlutKeyboard(unsigned char key, int x, int y);
 //-------------------------------------------------------------------------------
 
 void SendDataToOpenGL(char objName[]);
+void InstallShaders();
+void CompileShaders();
 
 //-------------------------------------------------------------------------------
 
@@ -80,6 +91,7 @@ void ShowViewport(int argc, char* argv[]) {
 	}
 
 	// install shaders to opengl
+	InstallShaders();
 
 	glutMainLoop();
 }
@@ -88,6 +100,9 @@ void ShowViewport(int argc, char* argv[]) {
 
 void GlutDisplay() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
+
 	glutSwapBuffers();
 }
 
@@ -124,6 +139,8 @@ void SendDataToOpenGL(char objName[]) {
 	
 	targetObject = new cyTriMesh();
 	if (targetObject->LoadFromFileObj(objPath, false)) {
+		printf("Successfully read object %s\n", objName);
+
 		// generate buffer-ready data
 		Vec3f* objVertices = new Vec3f[targetObject->NV()];
 		for (int i = 0; i < targetObject->NV(); i++) {
@@ -138,6 +155,7 @@ void SendDataToOpenGL(char objName[]) {
 			objIndices[i * 3 + 1] = currentFace.v[1];
 			objIndices[i * 3 + 2] = currentFace.v[2];
 		}
+		baseNumIndices = targetObject->NF() * 3;
 
 		// send vertex data & index data to buffers
 		glGenBuffers(1, &baseVertexBufferID);
@@ -146,7 +164,7 @@ void SendDataToOpenGL(char objName[]) {
 
 		glGenBuffers(1, &baseIndexBufferID);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, baseIndexBufferID);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, targetObject->NF() * 3, objIndices, GL_STATIC_DRAW);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, baseNumIndices, objIndices, GL_STATIC_DRAW);
 
 		delete[] objVertices;
 		delete[] objIndices;
@@ -162,6 +180,42 @@ void SendDataToOpenGL(char objName[]) {
 	else {
 		return;
 	}
+}
+//-------------------------------------------------------------------------------
+
+void InstallShaders() {
+	vertexShader = new GLSLShader();
+	fragmentShader = new GLSLShader();
+	baseProgram = new GLSLProgram();
+
+	CompileShaders();
+}
+
+//-------------------------------------------------------------------------------
+
+void CompileShaders() {
+	if (vertexShader == NULL) {
+		vertexShader = new GLSLShader();
+	}
+	if (fragmentShader == NULL) {
+		fragmentShader = new GLSLShader();
+	}
+
+	if (!vertexShader->CompileFile(vertexShaderPath, GL_VERTEX_SHADER)) {
+		return;
+	}
+	if (!fragmentShader->CompileFile(fragmentShaderPath, GL_FRAGMENT_SHADER)) {
+		return;
+	}
+
+	baseProgram->CreateProgram();
+	baseProgram->AttachShader(vertexShader->GetID());
+	baseProgram->AttachShader(fragmentShader->GetID());
+	baseProgram->Link();
+	baseProgram->Bind();
+
+	vertexShader->Delete();
+	fragmentShader->Delete();
 }
 
 //-------------------------------------------------------------------------------

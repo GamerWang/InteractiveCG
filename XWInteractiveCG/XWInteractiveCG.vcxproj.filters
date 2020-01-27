@@ -55,5 +55,8 @@
     <ClInclude Include="Programs\cyVector.h">
       <Filter>Source Files\Programs\cyClasses</Filter>
     </ClInclude>
+    <ClInclude Include="Programs\cyGL.h">
+      <Filter>Source Files\Programs\cyClasses</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
