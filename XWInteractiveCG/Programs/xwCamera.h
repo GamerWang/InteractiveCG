@@ -31,7 +31,7 @@ public:
 		viewDirection(0, 0, -70),
 		UP(0, 1, 0),
 		fov(Pi<float>() / 3),
-		aspect(.75f), 
+		aspect(4/3.0f), 
 		znear(.1f), 
 		zfar(1000), 
 		type(CameraType::XW_CAMERA_PERSPECTIVE) {}
