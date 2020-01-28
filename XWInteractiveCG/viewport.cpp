@@ -71,6 +71,7 @@ cyTriMesh* targetObject = nullptr;
 Vec3f baseObjectPosition;
 Vec3f baseObjectRotation;
 Vec3f baseObjectScale;
+Vec3f baseObjectCenter;
 
 Camera* baseCamera = nullptr;
 #define CAMERA_ROTATION_SPEED 0.001f
@@ -98,7 +99,7 @@ bool IsMouseDown() { return !(mouseStates[0] * mouseStates[1] * mouseStates[2]);
 
 void ShowViewport(int argc, char* argv[]) {
 	// initialize scene data
-	baseObjectPosition = Vec3f(0, 0, -10);
+	baseObjectPosition = Vec3f(0, 0, 0);
 	baseObjectRotation = Vec3f(0, 0, 0);
 	baseObjectScale = Vec3f(1, 1, 1);
 
@@ -142,6 +143,12 @@ void ShowViewport(int argc, char* argv[]) {
 		SendDataToOpenGL(argv[1]);
 	}
 
+	if (!targetObject->IsBoundBoxReady()) {
+		targetObject->ComputeBoundingBox();
+	}
+	baseObjectCenter = targetObject->GetBoundMax() + targetObject->GetBoundMin();
+	baseObjectCenter /= 2;
+
 	// install shaders to opengl
 	InstallShaders();
 
@@ -159,7 +166,8 @@ void GlutDisplay() {
 	Matrix4f objectToWorldMatrix =
 		Matrix4f::Translation(baseObjectPosition) *
 		Matrix4f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) * 
-		Matrix4f::Scale(baseObjectScale);
+		Matrix4f::Scale(baseObjectScale) *
+		Matrix4f::Translation(-baseObjectCenter);
 
 	Matrix4f WorldToViewMatrix =
 		baseCamera->WorldToViewMatrix();
@@ -175,8 +183,7 @@ void GlutDisplay() {
 
 	glBindVertexArray(baseVertexArrayObjectID);
 	glUniformMatrix4fv(objectToClampMatrixUniformLocation, 1, GL_FALSE, &objectToClampMatrix.cell[0]);
-	//glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
-	glDrawElements(GL_LINE_LOOP, baseNumIndices, GL_UNSIGNED_INT, 0);
+	glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
 
 	glutSwapBuffers();
 }
@@ -188,6 +195,7 @@ void GlutIdle() {
 	t = clock();
 
 	float tFrac = t / 1000.0f;
+	baseObjectRotation = Vec3f(-Pi<float>() / 2, tFrac / 10, 0);
 
 	glutPostRedisplay();
 }
@@ -254,7 +262,6 @@ void SendDataToOpenGL(char objName[]) {
 	
 	targetObject = new cyTriMesh();
 	if (targetObject->LoadFromFileObj(objPath, false)) {
-		printf("Successfully read object %s\n", objName);
 
 		// generate buffer-ready data
 		Vec3f* objVertices = new Vec3f[targetObject->NV()];
@@ -276,11 +283,10 @@ void SendDataToOpenGL(char objName[]) {
 		glGenBuffers(1, &baseVertexBufferID);
 		glBindBuffer(GL_ARRAY_BUFFER, baseVertexBufferID);
 		glBufferData(GL_ARRAY_BUFFER, targetObject->NV() * sizeof(Vec3f), objVertices, GL_STATIC_DRAW);
-		//glBufferData(GL_ARRAY_BUFFER, targetObject->NV(), objVertices, GL_STATIC_DRAW);
 
 		glGenBuffers(1, &baseIndexBufferID);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, baseIndexBufferID);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, baseNumIndices, objIndices, GL_STATIC_DRAW);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, baseNumIndices * sizeof(unsigned int), objIndices, GL_STATIC_DRAW);
 
 		delete[] objVertices;
 		delete[] objIndices;
@@ -291,7 +297,6 @@ void SendDataToOpenGL(char objName[]) {
 		glEnableVertexAttribArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, baseVertexBufferID);
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3f), 0);
-		//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, 0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, baseIndexBufferID);
 	}
 	else {

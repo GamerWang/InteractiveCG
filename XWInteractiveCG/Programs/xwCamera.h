@@ -27,8 +27,8 @@ class Camera {
 	CameraType type;
 public:
 	Camera() :
-		position(0, 0, 30),
-		viewDirection(0, 0, -1),
+		position(0, 0, 70),
+		viewDirection(0, 0, -70),
 		UP(0, 1, 0),
 		fov(Pi<float>() / 3),
 		aspect(.75f), 
@@ -39,6 +39,7 @@ public:
 	Matrix4f ViewToProjectionMatrix();
 	CameraType GetCameraType() { return type; }
 	void RotateCameraByLocal(Vec2f rotation);
+	void RotateCameraByTarget(Vec2f rotation);
 	void MoveCameraAlongView(float moveDistance);
 };
 
@@ -65,9 +66,15 @@ inline void Camera::RotateCameraByLocal(Vec2f rotation) {
 	rotationAxis.Normalize();
 	if (rotationAngle > 0) {
 		Matrix3f cameraRotationMatrix = Matrix3f::Rotation(rotationAxis, rotationAngle);
-		UP = cameraRotationMatrix * UP;
+		//UP = cameraRotationMatrix * UP;
 		viewDirection = cameraRotationMatrix * viewDirection;
 	}
+}
+
+//-------------------------------------------------------------------------------
+
+inline void Camera::RotateCameraByTarget(Vec2f rotation) {
+
 }
 
 //-------------------------------------------------------------------------------
