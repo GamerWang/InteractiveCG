@@ -27,8 +27,8 @@ class Camera {
 	CameraType type;
 public:
 	Camera() :
-		position(0, 0, 70),
-		viewDirection(0, 0, -70),
+		position(0, 0, 50),
+		viewDirection(0, 0, -50),
 		UP(0, 1, 0),
 		fov(Pi<float>() / 3),
 		aspect(4/3.0f), 

@@ -48,6 +48,7 @@ GLSLShader* vertexShader;
 GLSLShader* fragmentShader;
 GLSLProgram* baseProgram;
 GLuint objectToClampMatrixUniformLocation;
+GLuint dynamicColorUniformLocation;
 
 //-------------------------------------------------------------------------------
 
@@ -72,6 +73,8 @@ Vec3f baseObjectPosition;
 Vec3f baseObjectRotation;
 Vec3f baseObjectScale;
 Vec3f baseObjectCenter;
+
+Vec3f baseObjectColor;
 
 Camera* baseCamera = nullptr;
 #define CAMERA_ROTATION_SPEED 0.001f
@@ -102,6 +105,8 @@ void ShowViewport(int argc, char* argv[]) {
 	baseObjectPosition = Vec3f(0, 0, 0);
 	baseObjectRotation = Vec3f(0, 0, 0);
 	baseObjectScale = Vec3f(1, 1, 1);
+
+	baseObjectColor = Vec3f(0, 0, 0);
 
 	baseCamera = new Camera();
 
@@ -183,6 +188,7 @@ void GlutDisplay() {
 
 	glBindVertexArray(baseVertexArrayObjectID);
 	glUniformMatrix4fv(objectToClampMatrixUniformLocation, 1, GL_FALSE, &objectToClampMatrix.cell[0]);
+	glUniform3fv(dynamicColorUniformLocation, 1, baseObjectColor.Elements());
 	glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
 
 	glutSwapBuffers();
@@ -196,6 +202,10 @@ void GlutIdle() {
 
 	float tFrac = t / 1000.0f;
 	baseObjectRotation = Vec3f(-Pi<float>() / 2, tFrac / 10, 0);
+
+	baseObjectColor.x = .5f * sinf(tFrac) + .5f;
+	baseObjectColor.y = .5f * cosf(2 * tFrac - 2) + .5f;
+	baseObjectColor.z = .5f * sinf(-3 * tFrac + 1) + .5f;
 
 	glutPostRedisplay();
 }
@@ -313,6 +323,7 @@ void InstallShaders() {
 	CompileShaders();
 
 	objectToClampMatrixUniformLocation = glGetUniformLocation(baseProgram->GetID(), "objectToClampMatrix");
+	dynamicColorUniformLocation = glGetUniformLocation(baseProgram->GetID(), "dynamicColor");
 }
 
 //-------------------------------------------------------------------------------
