@@ -25,6 +25,9 @@
     <Filter Include="Source Files\Data\Shaders">
       <UniqueIdentifier>{4e263a27-45bd-4b32-a782-21d26fa7b69a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Programs\SceneObjects">
+      <UniqueIdentifier>{2b1ee7c1-7865-41d4-8773-2797fd62086a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -57,6 +60,12 @@
     </ClInclude>
     <ClInclude Include="Programs\cyGL.h">
       <Filter>Source Files\Programs\cyClasses</Filter>
+    </ClInclude>
+    <ClInclude Include="Programs\cyMatrix.h">
+      <Filter>Source Files\Programs\cyClasses</Filter>
+    </ClInclude>
+    <ClInclude Include="Programs\xwCamera.h">
+      <Filter>Source Files\Programs\SceneObjects</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

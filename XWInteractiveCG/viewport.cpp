@@ -33,17 +33,21 @@
 #include "cyVector.h";
 #include "cyTriMesh.h";
 #include "cyGL.h"
+#include "cyMatrix.h";
 using namespace cy;
 
 //-------------------------------------------------------------------------------
 
-Vec3f* bgColor = nullptr;
-cyTriMesh* targetObject = nullptr;
+#include "xwCamera.h";
+
+//-------------------------------------------------------------------------------
+
 char vertexShaderPath[30] = "Data\\VertexShader.glsl";
 char fragmentShaderPath[30] = "Data\\FragmentShader.glsl";
 GLSLShader* vertexShader;
 GLSLShader* fragmentShader;
 GLSLProgram* baseProgram;
+GLuint objectToClampMatrixUniformLocation;
 
 //-------------------------------------------------------------------------------
 
@@ -54,9 +58,31 @@ GLuint baseNumIndices;
 
 //-------------------------------------------------------------------------------
 
+int mouseStates[3];
+int mousePos[2];
+int screenSize[2];
+int lastTickMousePos[2];
+
+//-------------------------------------------------------------------------------
+
+Vec3f* bgColor = nullptr;
+cyTriMesh* targetObject = nullptr;
+
+Vec3f baseObjectPosition;
+Vec3f baseObjectRotation;
+Vec3f baseObjectScale;
+
+Camera* baseCamera = nullptr;
+#define CAMERA_ROTATION_SPEED 0.001f
+#define CAMERA_MOVE_SPEED 0.03f
+
+//-------------------------------------------------------------------------------
+
 void GlutDisplay();
 void GlutIdle();
 void GlutKeyboard(unsigned char key, int x, int y);
+void GlutMouseClick(int button, int state, int x, int y);
+void GlutMouseDrag(int x, int y);
 
 //-------------------------------------------------------------------------------
 
@@ -66,17 +92,43 @@ void CompileShaders();
 
 //-------------------------------------------------------------------------------
 
+bool IsMouseDown() { return !(mouseStates[0] * mouseStates[1] * mouseStates[2]); }
+
+//-------------------------------------------------------------------------------
+
 void ShowViewport(int argc, char* argv[]) {
+	// initialize scene data
+	baseObjectPosition = Vec3f(0, 0, -10);
+	baseObjectRotation = Vec3f(0, 0, 0);
+	baseObjectScale = Vec3f(1, 1, 1);
+
+	baseCamera = new Camera();
+
+	bgColor = new Vec3f(0, 0, 0);
+
+	for (int i = 0; i < 3; i++)
+		mouseStates[i] = GLUT_UP;
+
+	mousePos[0] = 0;
+	mousePos[1] = 0;
+
+	lastTickMousePos[0] = mousePos[0];
+	lastTickMousePos[1] = mousePos[1];
+
+	screenSize[0] = 800;
+	screenSize[1] = 600;
+
 	// basic settings for the viewport
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
 	glutInitWindowPosition(50, 50);
-	glutInitWindowSize(800, 600);
+	glutInitWindowSize(screenSize[0], screenSize[1]);
 	glutCreateWindow("XW Renderer - CS6610");
 	glutDisplayFunc(GlutDisplay);
 	glutIdleFunc(GlutIdle);
 	glutKeyboardFunc(GlutKeyboard);
-	bgColor = new Vec3f(0, 0, 0);
+	glutMouseFunc(GlutMouseClick);
+	glutMotionFunc(GlutMouseDrag);
 	glClearColor(bgColor->x, bgColor->y, bgColor->z, 0);
 	
 	glewInit();
@@ -99,9 +151,32 @@ void ShowViewport(int argc, char* argv[]) {
 //-------------------------------------------------------------------------------
 
 void GlutDisplay() {
+	// compute matrices here
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
+	// send uniforms here
+	Matrix4f objectToWorldMatrix =
+		Matrix4f::Translation(baseObjectPosition) *
+		Matrix4f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) * 
+		Matrix4f::Scale(baseObjectScale);
+
+	Matrix4f WorldToViewMatrix =
+		baseCamera->WorldToViewMatrix();
+
+	Matrix4f objectToClampMatrix = WorldToViewMatrix * objectToWorldMatrix;
+	if (baseCamera->GetCameraType() == CameraType::XW_CAMERA_PERSPECTIVE) {
+		Matrix4f viewToProjectionMatrix = baseCamera->ViewToProjectionMatrix();
+		objectToClampMatrix = viewToProjectionMatrix * objectToClampMatrix;
+	}
+	else if (baseCamera->GetCameraType() == CameraType::XW_CAMERA_ORTHOGONAL) {
+		objectToClampMatrix.OrthogonalizeZ();
+	}
+
+	glBindVertexArray(baseVertexArrayObjectID);
+	glUniformMatrix4fv(objectToClampMatrixUniformLocation, 1, GL_FALSE, &objectToClampMatrix.cell[0]);
+	//glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
+	glDrawElements(GL_LINE_LOOP, baseNumIndices, GL_UNSIGNED_INT, 0);
 
 	glutSwapBuffers();
 }
@@ -113,7 +188,6 @@ void GlutIdle() {
 	t = clock();
 
 	float tFrac = t / 1000.0f;
-	//printf("%f\n", tFrac);
 
 	glutPostRedisplay();
 }
@@ -125,9 +199,50 @@ void GlutKeyboard(unsigned char key, int x, int y) {
 	case 27:
 		exit(0);
 		break;
+	case GLUT_KEY_F6:
+	case '6':
+		printf("Recompile shaders\n");
+		CompileShaders();
+		break;
 	default:
 		break;
 	}
+}
+
+//-------------------------------------------------------------------------------
+
+void GlutMouseClick(int button, int state, int x, int y) {
+	mouseStates[button] = state;
+	if (state == GLUT_DOWN) {
+		lastTickMousePos[0] = x;
+		lastTickMousePos[1] = y;
+	}
+	mousePos[0] = x;
+	mousePos[1] = y;
+}
+
+//-------------------------------------------------------------------------------
+
+void GlutMouseDrag(int x, int y) {
+	if (IsMouseDown()) {
+		Vec2f mouseMove = Vec2f(x - lastTickMousePos[0], y - lastTickMousePos[1]);
+		mouseMove.y *= -1;
+		if (mouseStates[GLUT_LEFT_BUTTON] == GLUT_DOWN) {
+			Vec2f cameraRotate = mouseMove * CAMERA_ROTATION_SPEED;
+			baseCamera->RotateCameraByLocal(cameraRotate);
+		}
+		else if (mouseStates[GLUT_RIGHT_BUTTON] == GLUT_DOWN) {
+			float cameraMoveDis = mouseMove.Dot(Vec2f(1, -1)) * CAMERA_MOVE_SPEED;
+			baseCamera->MoveCameraAlongView(cameraMoveDis);
+		}
+		else if (mouseStates[GLUT_MIDDLE_BUTTON] == GLUT_DOWN) {
+
+		}
+		lastTickMousePos[0] = mousePos[0];
+		lastTickMousePos[1] = mousePos[1];
+	}
+	mousePos[0] = x;
+	mousePos[1] = y;
 }
 
 //-------------------------------------------------------------------------------
@@ -160,7 +275,8 @@ void SendDataToOpenGL(char objName[]) {
 		// send vertex data & index data to buffers
 		glGenBuffers(1, &baseVertexBufferID);
 		glBindBuffer(GL_ARRAY_BUFFER, baseVertexBufferID);
-		glBufferData(GL_ARRAY_BUFFER, targetObject->NV(), objVertices, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, targetObject->NV() * sizeof(Vec3f), objVertices, GL_STATIC_DRAW);
+		//glBufferData(GL_ARRAY_BUFFER, targetObject->NV(), objVertices, GL_STATIC_DRAW);
 
 		glGenBuffers(1, &baseIndexBufferID);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, baseIndexBufferID);
@@ -174,7 +290,8 @@ void SendDataToOpenGL(char objName[]) {
 		glBindVertexArray(baseVertexArrayObjectID);
 		glEnableVertexAttribArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, baseVertexBufferID);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, 0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3f), 0);
+		//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, 0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, baseIndexBufferID);
 	}
 	else {
@@ -189,6 +306,8 @@ void InstallShaders() {
 	baseProgram = new GLSLProgram();
 
 	CompileShaders();
+
+	objectToClampMatrixUniformLocation = glGetUniformLocation(baseProgram->GetID(), "objectToClampMatrix");
 }
 
 //-------------------------------------------------------------------------------
