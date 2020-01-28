@@ -87,6 +87,7 @@ void GlutIdle();
 void GlutKeyboard(unsigned char key, int x, int y);
 void GlutMouseClick(int button, int state, int x, int y);
 void GlutMouseDrag(int x, int y);
+void GlutReshapeWindow(int width, int height);
 
 //-------------------------------------------------------------------------------
 
@@ -108,8 +109,6 @@ void ShowViewport(int argc, char* argv[]) {
 
 	baseObjectColor = Vec3f(0, 0, 0);
 
-	baseCamera = new Camera();
-
 	bgColor = new Vec3f(0, 0, 0);
 
 	for (int i = 0; i < 3; i++)
@@ -122,7 +121,10 @@ void ShowViewport(int argc, char* argv[]) {
 	lastTickMousePos[1] = mousePos[1];
 
 	screenSize[0] = 800;
-	screenSize[1] = 600;
+	screenSize[1] = 800;
+
+	baseCamera = new Camera();
+	baseCamera->SetAspect((float)screenSize[0] / (float)screenSize[1]);
 
 	// basic settings for the viewport
 	glutInit(&argc, argv);
@@ -132,6 +134,7 @@ void ShowViewport(int argc, char* argv[]) {
 	glutCreateWindow("XW Renderer - CS6610");
 	glutDisplayFunc(GlutDisplay);
 	glutIdleFunc(GlutIdle);
+	//glutReshapeFunc(GlutReshapeWindow);
 	glutKeyboardFunc(GlutKeyboard);
 	glutMouseFunc(GlutMouseClick);
 	glutMotionFunc(GlutMouseDrag);
@@ -261,6 +264,11 @@ void GlutMouseDrag(int x, int y) {
 	}
 	mousePos[0] = x;
 	mousePos[1] = y;
+}
+
+//-------------------------------------------------------------------------------
+
+void GlutReshapeWindow(int width, int height) {
 }
 
 //-------------------------------------------------------------------------------

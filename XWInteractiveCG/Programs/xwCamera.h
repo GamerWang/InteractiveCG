@@ -31,13 +31,16 @@ public:
 		viewDirection(0, 0, -50),
 		UP(0, 1, 0),
 		fov(Pi<float>() / 3),
-		aspect(4/3.0f), 
+		aspect(1), 
 		znear(.1f), 
 		zfar(1000), 
 		type(CameraType::XW_CAMERA_PERSPECTIVE) {}
 	Matrix4f WorldToViewMatrix();
 	Matrix4f ViewToProjectionMatrix();
+	
+	void SetAspect(float f) { aspect = f; }
 	CameraType GetCameraType() { return type; }
+	
 	void RotateCameraByLocal(Vec2f rotation);
 	void RotateCameraByTarget(Vec2f rotation);
 	void MoveCameraAlongView(float moveDistance);
