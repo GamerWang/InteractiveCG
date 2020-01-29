@@ -85,6 +85,7 @@ Camera* baseCamera = nullptr;
 void GlutDisplay();
 void GlutIdle();
 void GlutKeyboard(unsigned char key, int x, int y);
+void GlutSpecialKey(int key, int x, int y);
 void GlutMouseClick(int button, int state, int x, int y);
 void GlutMouseDrag(int x, int y);
 void GlutReshapeWindow(int width, int height);
@@ -136,6 +137,7 @@ void ShowViewport(int argc, char* argv[]) {
 	glutIdleFunc(GlutIdle);
 	//glutReshapeFunc(GlutReshapeWindow);
 	glutKeyboardFunc(GlutKeyboard);
+	glutSpecialFunc(GlutSpecialKey);
 	glutMouseFunc(GlutMouseClick);
 	glutMotionFunc(GlutMouseDrag);
 	glClearColor(bgColor->x, bgColor->y, bgColor->z, 0);
@@ -220,12 +222,18 @@ void GlutKeyboard(unsigned char key, int x, int y) {
 	case 27:
 		exit(0);
 		break;
+	default:
+		break;
+	}
+}
+
+//-------------------------------------------------------------------------------
+
+void GlutSpecialKey(int key, int x, int y) {
+	switch (key) {
 	case GLUT_KEY_F6:
-	case '6':
 		printf("Recompile shaders\n");
 		CompileShaders();
-		break;
-	default:
 		break;
 	}
 }
