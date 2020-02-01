@@ -39,6 +39,14 @@ using namespace cy;
 //-------------------------------------------------------------------------------
 
 #include "xwCamera.h";
+#include "xwLights.h";
+
+//-------------------------------------------------------------------------------
+
+enum RenderMode {
+	XW_RENDER_TRIANGLES,
+	XW_RENDER_LINELOOP
+};
 
 //-------------------------------------------------------------------------------
 
@@ -47,9 +55,19 @@ char fragmentShaderPath[30] = "Data\\FragmentShader.glsl";
 GLSLShader* vertexShader;
 GLSLShader* fragmentShader;
 GLSLProgram* baseProgram;
-GLuint objectToClampMatrixUniformLocation;
-GLuint objectToWorldMatrixUniformLocation;
-GLuint dynamicColorUniformLocation;
+
+//-------------------------------------------------------------------------------
+
+char uniformNames[500] = {
+	"worldToClampMatrix "
+	"objectToWorldMatrix "
+	"glossiness "
+	"diffuseColor "
+	"specularColor "
+	"cameraPosition "
+	"pointLight0pos "
+	"pointLight0Intensity "
+};
 
 //-------------------------------------------------------------------------------
 
@@ -58,6 +76,10 @@ GLuint baseVertexBufferID;
 GLuint baseVertexNormalBufferID;
 GLuint baseIndexBufferID;
 GLuint baseNumIndices;
+
+//-------------------------------------------------------------------------------
+
+RenderMode renderMode;
 
 //-------------------------------------------------------------------------------
 
@@ -71,6 +93,9 @@ int lastTickMousePos[2];
 //-------------------------------------------------------------------------------
 
 Vec3f* bgColor = nullptr;
+
+//-------------------------------------------------------------------------------
+
 cyTriMesh* targetObject = nullptr;
 
 Vec3f baseObjectPosition;
@@ -79,6 +104,17 @@ Vec3f baseObjectScale;
 Vec3f baseObjectCenter;
 
 Vec3f baseObjectColor;
+Vec3f baseObjectDiffuseColor;
+Vec3f baseObjectSpecularColor;
+float baseObjectGlossiness;
+
+//-------------------------------------------------------------------------------
+
+Light ambientLight = Light();
+PointLight pointLight0 = PointLight();
+DirectionalLight dirLight0 = DirectionalLight();
+
+//-------------------------------------------------------------------------------
 
 Camera* baseCamera = nullptr;
 #define CAMERA_ROTATION_SPEED 0.001f
@@ -113,6 +149,10 @@ void ShowViewport(int argc, char* argv[]) {
 	baseObjectRotation = Vec3f(0, 0, 0);
 	baseObjectScale = Vec3f(1, 1, 1);
 
+	baseObjectGlossiness = 20;
+	baseObjectDiffuseColor = Vec3f(.1f, .1f, .9f);
+	baseObjectSpecularColor = Vec3f(.9f);
+
 	baseObjectColor = Vec3f(0, 0, 0);
 
 	bgColor = new Vec3f(0, 0, 0);
@@ -134,6 +174,12 @@ void ShowViewport(int argc, char* argv[]) {
 
 	baseCamera = new Camera();
 	baseCamera->SetAspect((float)screenSize[0] / (float)screenSize[1]);
+
+	ambientLight.SetIntensity(.05f);
+	pointLight0.SetPosition(Vec3f(-20, 20, 0));
+	pointLight0.SetIntensity(Vec3f(1, .5f, .5f));
+
+	renderMode = XW_RENDER_TRIANGLES;
 
 	// basic settings for the viewport
 	glutInit(&argc, argv);
@@ -193,22 +239,40 @@ void GlutDisplay() {
 	Matrix4f WorldToViewMatrix =
 		baseCamera->WorldToViewMatrix();
 
-	Matrix4f objectToClampMatrix = WorldToViewMatrix * objectToWorldMatrix;
+	Matrix4f worldToClampMatrix = WorldToViewMatrix;
 	if (baseCamera->GetCameraType() == CameraType::XW_CAMERA_PERSPECTIVE) {
 		Matrix4f viewToProjectionMatrix = baseCamera->ViewToProjectionMatrix();
-		objectToClampMatrix = viewToProjectionMatrix * objectToClampMatrix;
+		worldToClampMatrix = viewToProjectionMatrix * worldToClampMatrix;
 	}
 	else if (baseCamera->GetCameraType() == CameraType::XW_CAMERA_ORTHOGONAL) {
-		objectToClampMatrix.OrthogonalizeZ();
+		worldToClampMatrix.OrthogonalizeZ();
 	}
 
 	glBindVertexArray(baseVertexArrayObjectID);
-	glUniformMatrix4fv(objectToClampMatrixUniformLocation, 1, GL_FALSE, &objectToClampMatrix.cell[0]);
-	glUniformMatrix4fv(objectToWorldMatrixUniformLocation, 1, GL_FALSE, &objectToWorldMatrix.cell[0]);
-	glUniform3fv(dynamicColorUniformLocation, 1, baseObjectColor.Elements());
 
-	glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
-	//glDrawElements(GL_LINE_LOOP, baseNumIndices, GL_UNSIGNED_INT, 0);
+	baseProgram->SetUniformMatrix4("worldToClampMatrix", &worldToClampMatrix.cell[0]);
+	baseProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
+
+	baseProgram->SetUniform1("glossiness", 1, &baseObjectGlossiness);
+	baseProgram->SetUniform3("diffuseColor", 1, baseObjectDiffuseColor.Elements());
+	baseProgram->SetUniform3("specularColor", 1, baseObjectSpecularColor.Elements());
+
+	baseProgram->SetUniform3("cameraPosition", 1, baseCamera->GetPosition().Elements());
+	baseProgram->SetUniform3("ambientLight", 1, ambientLight.GetIntensity().Elements());
+	baseProgram->SetUniform3("pointLight0pos", 1, pointLight0.GetPosition().Elements());
+	baseProgram->SetUniform3("pointLight0Intensity", 1, pointLight0.GetIntensity().Elements());
+
+	switch (renderMode)
+	{
+	case XW_RENDER_LINELOOP:
+		glDrawElements(GL_LINE_LOOP, baseNumIndices, GL_UNSIGNED_INT, 0);
+		break;
+	case XW_RENDER_TRIANGLES:
+	default:
+		glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
+		break;
+	}
+
 	glutSwapBuffers();
 }
 
@@ -231,6 +295,12 @@ void GlutIdle() {
 
 void GlutKeyboard(unsigned char key, int x, int y) {
 	switch (key) {
+	case '1':
+		renderMode = XW_RENDER_TRIANGLES;
+		break;
+	case '2':
+		renderMode = XW_RENDER_LINELOOP;
+		break;
 	case 'r':
 	case 'R':
 		baseCamera->Reset();
@@ -400,9 +470,7 @@ void InstallShaders() {
 
 	CompileShaders();
 
-	objectToClampMatrixUniformLocation = glGetUniformLocation(baseProgram->GetID(), "objectToClampMatrix");
-	objectToWorldMatrixUniformLocation = glGetUniformLocation(baseProgram->GetID(), "objectToWorldMatrix");
-	dynamicColorUniformLocation = glGetUniformLocation(baseProgram->GetID(), "dynamicColor");
+	baseProgram->RegisterUniforms(uniformNames);
 }
 
 //-------------------------------------------------------------------------------

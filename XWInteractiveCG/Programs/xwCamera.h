@@ -50,6 +50,8 @@ public:
 	void SwitchCameraType() { type = 
 		type == XW_CAMERA_PERSPECTIVE ? XW_CAMERA_ORTHOGONAL : XW_CAMERA_PERSPECTIVE; }
 	
+	Vec3f GetPosition() { return position; }
+
 	void RotateCameraByLocal(Vec2f rotation);
 	void RotateCameraByTarget(Vec2f rotation);
 	void MoveCameraAlongView(float moveDistance);
