@@ -198,7 +198,7 @@ void GlutDisplay() {
 	glUniformMatrix4fv(objectToClampMatrixUniformLocation, 1, GL_FALSE, &objectToClampMatrix.cell[0]);
 	glUniform3fv(dynamicColorUniformLocation, 1, baseObjectColor.Elements());
 	glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
-
+	//glDrawElements(GL_LINE_LOOP, baseNumIndices, GL_UNSIGNED_INT, 0);
 	glutSwapBuffers();
 }
 
@@ -223,7 +223,12 @@ void GlutIdle() {
 void GlutKeyboard(unsigned char key, int x, int y) {
 	switch (key) {
 	case 'r':
+	case 'R':
 		baseCamera->Reset();
+		break;
+	case 'p':
+	case 'P':
+		baseCamera->SwitchCameraType();
 		break;
 	case 27:
 		exit(0);
@@ -302,7 +307,6 @@ void SendDataToOpenGL(char objName[]) {
 			objVertices[i] = targetObject->V(i);
 			objNormals[i] = targetObject->VN(i);
 		}
-
 
 		//GLushort* indices = new GLushort[targetObject->NF() * 3];
 		unsigned int* objIndices = new unsigned int[targetObject->NF() * 3];

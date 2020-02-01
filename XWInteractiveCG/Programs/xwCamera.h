@@ -30,6 +30,7 @@ class Camera {
 	float znear;
 	float zfar;
 	CameraType type;
+	Vec3f originPoint;
 public:
 	Camera() :
 		position(0, 0, 50),
@@ -39,12 +40,15 @@ public:
 		aspect(1), 
 		znear(.1f), 
 		zfar(1000), 
-		type(CameraType::XW_CAMERA_PERSPECTIVE) {}
+		type(XW_CAMERA_PERSPECTIVE) {}
 	
 	void Reset();
 
 	void SetAspect(float f) { aspect = f; }
+	void SetCameraType(CameraType t) { type = t; }
 	CameraType GetCameraType() { return type; }
+	void SwitchCameraType() { type = 
+		type == XW_CAMERA_PERSPECTIVE ? XW_CAMERA_ORTHOGONAL : XW_CAMERA_PERSPECTIVE; }
 	
 	void RotateCameraByLocal(Vec2f rotation);
 	void RotateCameraByTarget(Vec2f rotation);
@@ -76,7 +80,7 @@ inline void Camera::Reset() {
 	aspect = 1;
 	znear = .1f;
 	zfar = 1000;
-	type = CameraType::XW_CAMERA_PERSPECTIVE;
+	type = XW_CAMERA_PERSPECTIVE;
 }
 
 //-------------------------------------------------------------------------------
