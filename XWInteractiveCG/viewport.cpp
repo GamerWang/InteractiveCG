@@ -48,6 +48,7 @@ GLSLShader* vertexShader;
 GLSLShader* fragmentShader;
 GLSLProgram* baseProgram;
 GLuint objectToClampMatrixUniformLocation;
+GLuint objectToWorldMatrixUniformLocation;
 GLuint dynamicColorUniformLocation;
 
 //-------------------------------------------------------------------------------
@@ -61,6 +62,8 @@ GLuint baseNumIndices;
 //-------------------------------------------------------------------------------
 
 int mouseStates[3];
+int keyStates[256];
+int specialKeyStates[128];
 int mousePos[2];
 int screenSize[2];
 int lastTickMousePos[2];
@@ -87,6 +90,7 @@ void GlutDisplay();
 void GlutIdle();
 void GlutKeyboard(unsigned char key, int x, int y);
 void GlutSpecialKey(int key, int x, int y);
+void GlutSpecialKeyUp(int key, int x, int y);
 void GlutMouseClick(int button, int state, int x, int y);
 void GlutMouseDrag(int x, int y);
 void GlutReshapeWindow(int width, int height);
@@ -119,6 +123,9 @@ void ShowViewport(int argc, char* argv[]) {
 	mousePos[0] = 0;
 	mousePos[1] = 0;
 
+	for (int i = 0; i < 128; i++)
+		specialKeyStates[i] = GLUT_UP;
+
 	lastTickMousePos[0] = mousePos[0];
 	lastTickMousePos[1] = mousePos[1];
 
@@ -139,6 +146,7 @@ void ShowViewport(int argc, char* argv[]) {
 	//glutReshapeFunc(GlutReshapeWindow);
 	glutKeyboardFunc(GlutKeyboard);
 	glutSpecialFunc(GlutSpecialKey);
+	glutSpecialUpFunc(GlutSpecialKeyUp);
 	glutMouseFunc(GlutMouseClick);
 	glutMotionFunc(GlutMouseDrag);
 	glClearColor(bgColor->x, bgColor->y, bgColor->z, 0);
@@ -196,7 +204,9 @@ void GlutDisplay() {
 
 	glBindVertexArray(baseVertexArrayObjectID);
 	glUniformMatrix4fv(objectToClampMatrixUniformLocation, 1, GL_FALSE, &objectToClampMatrix.cell[0]);
+	glUniformMatrix4fv(objectToWorldMatrixUniformLocation, 1, GL_FALSE, &objectToWorldMatrix.cell[0]);
 	glUniform3fv(dynamicColorUniformLocation, 1, baseObjectColor.Elements());
+
 	glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
 	//glDrawElements(GL_LINE_LOOP, baseNumIndices, GL_UNSIGNED_INT, 0);
 	glutSwapBuffers();
@@ -209,7 +219,6 @@ void GlutIdle() {
 	t = clock();
 
 	float tFrac = t / 1000.0f;
-	//baseObjectRotation = Vec3f(-Pi<float>() / 2, tFrac / 10, 0);
 
 	baseObjectColor.x = .5f * sinf(tFrac) + .5f;
 	baseObjectColor.y = .5f * cosf(2 * tFrac - 2) + .5f;
@@ -225,6 +234,7 @@ void GlutKeyboard(unsigned char key, int x, int y) {
 	case 'r':
 	case 'R':
 		baseCamera->Reset();
+		printf("R, %d, %d\n", x, y);
 		break;
 	case 'p':
 	case 'P':
@@ -245,6 +255,26 @@ void GlutSpecialKey(int key, int x, int y) {
 	case GLUT_KEY_F6:
 		printf("Recompile shaders\n");
 		CompileShaders();
+		break;
+	case GLUT_KEY_CTRL_L:
+	case GLUT_KEY_CTRL_R:
+		specialKeyStates[key] = GLUT_DOWN;
+		break;
+	default:
+		break;
+	}
+}
+
+//-------------------------------------------------------------------------------
+
+void GlutSpecialKeyUp(int key, int x, int y) {
+	switch (key)
+	{
+	case GLUT_KEY_CTRL_L:
+	case GLUT_KEY_CTRL_R:
+		specialKeyStates[key] = GLUT_UP;
+		break;
+	default:
 		break;
 	}
 }
@@ -268,13 +298,19 @@ void GlutMouseDrag(int x, int y) {
 		Vec2f mouseMove = Vec2f(x - lastTickMousePos[0], y - lastTickMousePos[1]);
 		mouseMove.y *= -1;
 		if (mouseStates[GLUT_LEFT_BUTTON] == GLUT_DOWN) {
-			Vec2f cameraRotate = mouseMove * CAMERA_ROTATION_SPEED;
-			//baseCamera->RotateCameraByLocal(cameraRotate);
-			baseCamera->RotateCameraByTarget(cameraRotate);
+			if (specialKeyStates[GLUT_KEY_CTRL_L] * specialKeyStates[GLUT_KEY_CTRL_R] == GLUT_DOWN) {
+				printf("Light move!\n");
+			}
+			else {
+				Vec2f cameraRotate = mouseMove * CAMERA_ROTATION_SPEED;
+				//baseCamera->RotateCameraByLocal(cameraRotate);
+				baseCamera->RotateCameraByTarget(cameraRotate);
+			}
 		}
 		else if (mouseStates[GLUT_RIGHT_BUTTON] == GLUT_DOWN) {
 			float cameraMoveDis = mouseMove.Dot(Vec2f(1, -1)) * CAMERA_MOVE_SPEED;
-			baseCamera->MoveCameraAlongView(cameraMoveDis);
+			//baseCamera->MoveCameraAlongView(cameraMoveDis);
+			baseCamera->ScaleDistanceAlongView(cameraMoveDis);
 		}
 		else if (mouseStates[GLUT_MIDDLE_BUTTON] == GLUT_DOWN) {
 
@@ -301,31 +337,37 @@ void SendDataToOpenGL(char objName[]) {
 	targetObject = new cyTriMesh();
 	if (targetObject->LoadFromFileObj(objPath, false)) {
 		// generate buffer-ready data
-		Vec3f* objVertices = new Vec3f[targetObject->NV()];
-		Vec3f* objNormals = new Vec3f[targetObject->NV()];
-		for (int i = 0; i < targetObject->NV(); i++) {
-			objVertices[i] = targetObject->V(i);
+		Vec3f* objVertices = new Vec3f[targetObject->NVN()];
+		Vec3f* objNormals = new Vec3f[targetObject->NVN()];
+
+		for (int i = 0; i < targetObject->NVN(); i++) {
 			objNormals[i] = targetObject->VN(i);
 		}
 
 		//GLushort* indices = new GLushort[targetObject->NF() * 3];
 		unsigned int* objIndices = new unsigned int[targetObject->NF() * 3];
 		for (int i = 0; i < targetObject->NF(); i++) {
-			TriMesh::TriFace currentFace = targetObject->F(i);
-			objIndices[i * 3] = currentFace.v[0];
-			objIndices[i * 3 + 1] = currentFace.v[1];
-			objIndices[i * 3 + 2] = currentFace.v[2];
+			TriMesh::TriFace currentNormalFace = targetObject->FN(i);
+			unsigned int v0 = currentNormalFace.v[0];
+			unsigned int v1 = currentNormalFace.v[1];
+			unsigned int v2 = currentNormalFace.v[2];
+			objIndices[i * 3] = v0;
+			objIndices[i * 3 + 1] = v1;
+			objIndices[i * 3 + 2] = v2;
+			objVertices[v0] = targetObject->GetVec(i, Vec3f(1, 0, 0));
+			objVertices[v1] = targetObject->GetVec(i, Vec3f(0, 1, 0));
+			objVertices[v2] = targetObject->GetVec(i, Vec3f(0, 0, 1));
 		}
 		baseNumIndices = targetObject->NF() * 3;
 
 		// send vertex data & index data to buffers
 		glGenBuffers(1, &baseVertexBufferID);
 		glBindBuffer(GL_ARRAY_BUFFER, baseVertexBufferID);
-		glBufferData(GL_ARRAY_BUFFER, targetObject->NV() * sizeof(Vec3f), objVertices, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, targetObject->NVN() * sizeof(Vec3f), objVertices, GL_STATIC_DRAW);
 
 		glGenBuffers(1, &baseVertexNormalBufferID);
 		glBindBuffer(GL_ARRAY_BUFFER, baseVertexNormalBufferID);
-		glBufferData(GL_ARRAY_BUFFER, targetObject->NV() * sizeof(Vec3f), objNormals, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, targetObject->NVN() * sizeof(Vec3f), objNormals, GL_STATIC_DRAW);
 
 		glGenBuffers(1, &baseIndexBufferID);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, baseIndexBufferID);
@@ -359,6 +401,7 @@ void InstallShaders() {
 	CompileShaders();
 
 	objectToClampMatrixUniformLocation = glGetUniformLocation(baseProgram->GetID(), "objectToClampMatrix");
+	objectToWorldMatrixUniformLocation = glGetUniformLocation(baseProgram->GetID(), "objectToWorldMatrix");
 	dynamicColorUniformLocation = glGetUniformLocation(baseProgram->GetID(), "dynamicColor");
 }
 

@@ -17,7 +17,7 @@ enum CameraType {
 
 //-------------------------------------------------------------------------------
 
-#define polar_angle_bias 0.001f
+#define camera_bias 0.001f
 
 //-------------------------------------------------------------------------------
 
@@ -53,6 +53,7 @@ public:
 	void RotateCameraByLocal(Vec2f rotation);
 	void RotateCameraByTarget(Vec2f rotation);
 	void MoveCameraAlongView(float moveDistance);
+	void ScaleDistanceAlongView(float moveDistance);
 
 	Matrix4f WorldToViewMatrix();
 	Matrix4f ViewToProjectionMatrix();
@@ -123,6 +124,17 @@ inline void Camera::RotateCameraByTarget(Vec2f rotation) {
 
 inline void Camera::MoveCameraAlongView(float moveDistance) {
 	position = position + viewDirection.GetNormalized() * moveDistance;
+}
+
+//-------------------------------------------------------------------------------
+
+inline void Camera::ScaleDistanceAlongView(float moveDistance) {
+	Vec3f aimingPoint = position + viewDirection;
+	if (moveDistance - viewDirection.Length() > camera_bias) {
+		moveDistance = viewDirection.Length() - camera_bias;
+	}
+	viewDirection = viewDirection - viewDirection.GetNormalized() * moveDistance;
+	position = aimingPoint - viewDirection;
 }
 
 //-------------------------------------------------------------------------------
