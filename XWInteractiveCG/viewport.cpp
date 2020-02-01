@@ -54,6 +54,7 @@ GLuint dynamicColorUniformLocation;
 
 GLuint baseVertexArrayObjectID;
 GLuint baseVertexBufferID;
+GLuint baseVertexNormalBufferID;
 GLuint baseIndexBufferID;
 GLuint baseNumIndices;
 
@@ -143,6 +144,7 @@ void ShowViewport(int argc, char* argv[]) {
 	glClearColor(bgColor->x, bgColor->y, bgColor->z, 0);
 	
 	glewInit();
+	glEnable(GL_DEPTH_TEST);
 
 	// prepare data for opengl
 	if (argc <= 1) {
@@ -175,8 +177,9 @@ void GlutDisplay() {
 	// send uniforms here
 	Matrix4f objectToWorldMatrix =
 		Matrix4f::Translation(baseObjectPosition) *
-		Matrix4f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) * 
+		Matrix4f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) *
 		Matrix4f::Scale(baseObjectScale) *
+		Matrix4f::RotationXYZ(-Pi<float>() / 2, 0, 0) *
 		Matrix4f::Translation(-baseObjectCenter);
 
 	Matrix4f WorldToViewMatrix =
@@ -206,7 +209,7 @@ void GlutIdle() {
 	t = clock();
 
 	float tFrac = t / 1000.0f;
-	baseObjectRotation = Vec3f(-Pi<float>() / 2, tFrac / 10, 0);
+	//baseObjectRotation = Vec3f(-Pi<float>() / 2, tFrac / 10, 0);
 
 	baseObjectColor.x = .5f * sinf(tFrac) + .5f;
 	baseObjectColor.y = .5f * cosf(2 * tFrac - 2) + .5f;
@@ -219,6 +222,9 @@ void GlutIdle() {
 
 void GlutKeyboard(unsigned char key, int x, int y) {
 	switch (key) {
+	case 'r':
+		baseCamera->Reset();
+		break;
 	case 27:
 		exit(0);
 		break;
@@ -258,7 +264,8 @@ void GlutMouseDrag(int x, int y) {
 		mouseMove.y *= -1;
 		if (mouseStates[GLUT_LEFT_BUTTON] == GLUT_DOWN) {
 			Vec2f cameraRotate = mouseMove * CAMERA_ROTATION_SPEED;
-			baseCamera->RotateCameraByLocal(cameraRotate);
+			//baseCamera->RotateCameraByLocal(cameraRotate);
+			baseCamera->RotateCameraByTarget(cameraRotate);
 		}
 		else if (mouseStates[GLUT_RIGHT_BUTTON] == GLUT_DOWN) {
 			float cameraMoveDis = mouseMove.Dot(Vec2f(1, -1)) * CAMERA_MOVE_SPEED;
@@ -288,12 +295,14 @@ void SendDataToOpenGL(char objName[]) {
 	
 	targetObject = new cyTriMesh();
 	if (targetObject->LoadFromFileObj(objPath, false)) {
-
 		// generate buffer-ready data
 		Vec3f* objVertices = new Vec3f[targetObject->NV()];
+		Vec3f* objNormals = new Vec3f[targetObject->NV()];
 		for (int i = 0; i < targetObject->NV(); i++) {
 			objVertices[i] = targetObject->V(i);
+			objNormals[i] = targetObject->VN(i);
 		}
+
 
 		//GLushort* indices = new GLushort[targetObject->NF() * 3];
 		unsigned int* objIndices = new unsigned int[targetObject->NF() * 3];
@@ -310,6 +319,10 @@ void SendDataToOpenGL(char objName[]) {
 		glBindBuffer(GL_ARRAY_BUFFER, baseVertexBufferID);
 		glBufferData(GL_ARRAY_BUFFER, targetObject->NV() * sizeof(Vec3f), objVertices, GL_STATIC_DRAW);
 
+		glGenBuffers(1, &baseVertexNormalBufferID);
+		glBindBuffer(GL_ARRAY_BUFFER, baseVertexNormalBufferID);
+		glBufferData(GL_ARRAY_BUFFER, targetObject->NV() * sizeof(Vec3f), objNormals, GL_STATIC_DRAW);
+
 		glGenBuffers(1, &baseIndexBufferID);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, baseIndexBufferID);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, baseNumIndices * sizeof(unsigned int), objIndices, GL_STATIC_DRAW);
@@ -321,8 +334,11 @@ void SendDataToOpenGL(char objName[]) {
 		glGenVertexArrays(1, &baseVertexArrayObjectID);
 		glBindVertexArray(baseVertexArrayObjectID);
 		glEnableVertexAttribArray(0);
+		glEnableVertexAttribArray(1);
 		glBindBuffer(GL_ARRAY_BUFFER, baseVertexBufferID);
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3f), 0);
+		glBindBuffer(GL_ARRAY_BUFFER, baseVertexNormalBufferID);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3f), 0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, baseIndexBufferID);
 	}
 	else {

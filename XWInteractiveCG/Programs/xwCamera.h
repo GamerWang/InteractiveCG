@@ -16,6 +16,11 @@ enum CameraType {
 };
 
 //-------------------------------------------------------------------------------
+
+#define polar_angle_bias 0.001f
+
+//-------------------------------------------------------------------------------
+
 class Camera {
 	Vec3f position;
 	Vec3f viewDirection;
@@ -35,15 +40,18 @@ public:
 		znear(.1f), 
 		zfar(1000), 
 		type(CameraType::XW_CAMERA_PERSPECTIVE) {}
-	Matrix4f WorldToViewMatrix();
-	Matrix4f ViewToProjectionMatrix();
 	
+	void Reset();
+
 	void SetAspect(float f) { aspect = f; }
 	CameraType GetCameraType() { return type; }
 	
 	void RotateCameraByLocal(Vec2f rotation);
 	void RotateCameraByTarget(Vec2f rotation);
 	void MoveCameraAlongView(float moveDistance);
+
+	Matrix4f WorldToViewMatrix();
+	Matrix4f ViewToProjectionMatrix();
 };
 
 //-------------------------------------------------------------------------------
@@ -60,16 +68,29 @@ inline Matrix4f Camera::ViewToProjectionMatrix() {
 
 //-------------------------------------------------------------------------------
 
+inline void Camera::Reset() {
+	position = Vec3f(0, 0, 50);
+	viewDirection = Vec3f(0, 0, -50);
+	UP = Vec3f(0, 1, 0);
+	fov = Pi<float>() / 3;
+	aspect = 1;
+	znear = .1f;
+	zfar = 1000;
+	type = CameraType::XW_CAMERA_PERSPECTIVE;
+}
+
+//-------------------------------------------------------------------------------
+
 inline void Camera::RotateCameraByLocal(Vec2f rotation) {
 	float rotationAngle = rotation.Length();
 	Vec3f yDir = UP.GetNormalized();
 	Vec3f zDir = (-viewDirection).GetNormalized();
 	Vec3f xDir = yDir.Cross(zDir);
+	yDir = zDir.Cross(xDir);
 	Vec3f rotationAxis = (yDir * rotation.y + xDir * rotation.x).Cross(-zDir);
 	rotationAxis.Normalize();
 	if (rotationAngle > 0) {
 		Matrix3f cameraRotationMatrix = Matrix3f::Rotation(rotationAxis, rotationAngle);
-		//UP = cameraRotationMatrix * UP;
 		viewDirection = cameraRotationMatrix * viewDirection;
 	}
 }
@@ -77,7 +98,21 @@ inline void Camera::RotateCameraByLocal(Vec2f rotation) {
 //-------------------------------------------------------------------------------
 
 inline void Camera::RotateCameraByTarget(Vec2f rotation) {
-
+	rotation *= -1;
+	float rotationAngle = rotation.Length();
+	Vec3f yDir = UP.GetNormalized();
+	Vec3f zDir = (-viewDirection).GetNormalized();
+	Vec3f xDir = yDir.Cross(zDir);
+	yDir = zDir.Cross(xDir);
+	Vec3f rotationAxis = (yDir * rotation.y + xDir * rotation.x).Cross(-zDir);
+	rotationAxis.Normalize();
+	Vec3f aimingPoint = position + viewDirection;
+	Vec3f relativePosition = -viewDirection;
+	if (rotationAngle > 0) {
+		Matrix3f cameraRotationMatrix = Matrix3f::Rotation(rotationAxis, rotationAngle);
+		viewDirection = cameraRotationMatrix * viewDirection;
+		position = aimingPoint - viewDirection;
+	}
 }
 
 //-------------------------------------------------------------------------------
