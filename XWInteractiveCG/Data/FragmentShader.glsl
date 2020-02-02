@@ -22,6 +22,10 @@ void main(){
 	vec3 pointLight0Dir = normalize(pointLight0pos - worldPosition);
 	vec3 pointLight0HalfDir = normalize(viewDir + pointLight0Dir);
 
+	float viewTerm = dot(worldNml, viewDir);
+	viewTerm = ceil(viewTerm);
+	viewTerm = clamp(viewTerm, 0, 1);
+
 	// handling pointLight0
 	// diffuse part
 	vec3 diffuse = vec3(0);
@@ -38,6 +42,6 @@ void main(){
 	specular += specularTerm * pointLight0Intensity;
 	specular *= specularColor;
 
-	daColor = vec4(diffuse + specular + ambientLight, 1.0);
+	daColor = vec4(viewTerm*(diffuse + specular) + ambientLight, 1.0);
 //	daColor = vec4(worldNormal, 1.0);
 }

@@ -30,7 +30,8 @@ class Camera {
 	float znear;
 	float zfar;
 	CameraType type;
-	Vec3f originPoint;
+	Vec3f originPosition;
+	Vec2f cameraOriginRotation;
 public:
 	Camera() :
 		position(0, 0, 50),
@@ -40,7 +41,9 @@ public:
 		aspect(1), 
 		znear(.1f), 
 		zfar(1000), 
-		type(XW_CAMERA_PERSPECTIVE) {}
+		type(XW_CAMERA_PERSPECTIVE), 
+		originPosition(0), 
+		cameraOriginRotation(0) {}
 	
 	void Reset();
 
@@ -53,7 +56,7 @@ public:
 	Vec3f GetPosition() { return position; }
 
 	void RotateCameraByLocal(Vec2f rotation);
-	void RotateCameraByTarget(Vec2f rotation);
+	void RotateCameraByOrigin(Vec2f rotation);
 	void MoveCameraAlongView(float moveDistance);
 	void ScaleDistanceAlongView(float moveDistance);
 
@@ -104,22 +107,29 @@ inline void Camera::RotateCameraByLocal(Vec2f rotation) {
 
 //-------------------------------------------------------------------------------
 
-inline void Camera::RotateCameraByTarget(Vec2f rotation) {
-	rotation *= -1;
+inline void Camera::RotateCameraByOrigin(Vec2f rotation) {
+	rotation *= Vec2f(-1, 1);
 	float rotationAngle = rotation.Length();
-	Vec3f yDir = UP.GetNormalized();
-	Vec3f zDir = (-viewDirection).GetNormalized();
-	Vec3f xDir = yDir.Cross(zDir);
-	yDir = zDir.Cross(xDir);
-	Vec3f rotationAxis = (yDir * rotation.y + xDir * rotation.x).Cross(-zDir);
-	rotationAxis.Normalize();
-	Vec3f aimingPoint = position + viewDirection;
-	Vec3f relativePosition = -viewDirection;
+
 	if (rotationAngle > 0) {
-		Matrix3f cameraRotationMatrix = Matrix3f::Rotation(rotationAxis, rotationAngle);
-		viewDirection = cameraRotationMatrix * viewDirection;
-		position = aimingPoint - viewDirection;
+		Vec2f nextCameraOriginRotation = cameraOriginRotation + rotation;
+		Matrix3f baseRotationMatrix = 
+			Matrix3f::RotationXYZ(cameraOriginRotation.y, cameraOriginRotation.x, 0);
+		Matrix3f nextRotationMatrix = 
+			Matrix3f::RotationXYZ(nextCameraOriginRotation.y, nextCameraOriginRotation.x, 0);
+
+		baseRotationMatrix.Invert();
+		Matrix3f finalRotationMatrix = nextRotationMatrix * baseRotationMatrix;
+
+		Vec3f relativePosition = position - originPosition;
+		relativePosition = finalRotationMatrix * relativePosition;
+		position = relativePosition + originPosition;
+		viewDirection = finalRotationMatrix * viewDirection;
+		UP = finalRotationMatrix * UP;
+
+		cameraOriginRotation = nextCameraOriginRotation;
 	}
+
 }
 
 //-------------------------------------------------------------------------------

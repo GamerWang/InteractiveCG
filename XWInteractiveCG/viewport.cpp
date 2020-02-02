@@ -150,7 +150,7 @@ void ShowViewport(int argc, char* argv[]) {
 	baseObjectScale = Vec3f(1, 1, 1);
 
 	baseObjectGlossiness = 20;
-	baseObjectDiffuseColor = Vec3f(.1f, .1f, .9f);
+	baseObjectDiffuseColor = Vec3f(.3f, .6f, .9f);
 	baseObjectSpecularColor = Vec3f(.9f);
 
 	baseObjectColor = Vec3f(0, 0, 0);
@@ -175,7 +175,7 @@ void ShowViewport(int argc, char* argv[]) {
 	baseCamera = new Camera();
 	baseCamera->SetAspect((float)screenSize[0] / (float)screenSize[1]);
 
-	ambientLight.SetIntensity(.05f);
+	ambientLight.SetIntensity(.15f);
 	pointLight0.SetPosition(Vec3f(-20, 20, 0));
 	pointLight0.SetIntensity(Vec3f(1, .5f, .5f));
 
@@ -374,7 +374,7 @@ void GlutMouseDrag(int x, int y) {
 			else {
 				Vec2f cameraRotate = mouseMove * CAMERA_ROTATION_SPEED;
 				//baseCamera->RotateCameraByLocal(cameraRotate);
-				baseCamera->RotateCameraByTarget(cameraRotate);
+				baseCamera->RotateCameraByOrigin(cameraRotate);
 			}
 		}
 		else if (mouseStates[GLUT_RIGHT_BUTTON] == GLUT_DOWN) {
