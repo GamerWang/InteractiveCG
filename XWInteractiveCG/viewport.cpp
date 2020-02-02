@@ -60,14 +60,14 @@ GLSLProgram* baseProgram;
 //-------------------------------------------------------------------------------
 
 char uniformNames[500] = {
-	"worldToClampMatrix "
-	"objectToWorldMatrix "
-	"glossiness "
-	"diffuseColor "
-	"specularColor "
-	"cameraPosition "
-	"pointLight0pos "
-	"pointLight0Intensity "
+	"worldToClampMatrix"
+	" objectToWorldMatrix"
+	" glossiness"
+	" diffuseColor"
+	" specularColor"
+	" cameraPosition"
+	" pointLight0pos"
+	" pointLight0Intensity"
 };
 
 //-------------------------------------------------------------------------------

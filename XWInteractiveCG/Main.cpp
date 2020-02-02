@@ -9,8 +9,8 @@
 ///
 //-------------------------------------------------------------------------------
 
-#define default_obj_name "teapot.obj"
 #define enable_default_obj
+char defaultObjName[20] = "teapot.obj ";
 
 //-------------------------------------------------------------------------------
 
@@ -22,7 +22,6 @@ int main(int argc, char *argv[]) {
 #ifdef enable_default_obj
 	if (argc <= 1) {
 		argc = 2;
-		char defaultObjName[] = default_obj_name;
 		argv[1] = defaultObjName;
 	}
 #endif
