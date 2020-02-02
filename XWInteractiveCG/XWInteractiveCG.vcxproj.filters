@@ -28,6 +28,9 @@
     <Filter Include="Source Files\Programs\SceneObjects">
       <UniqueIdentifier>{2b1ee7c1-7865-41d4-8773-2797fd62086a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Programs\Helpers">
+      <UniqueIdentifier>{dca28641-09bd-41e0-8732-4aa77e54e44b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -69,6 +72,9 @@
     </ClInclude>
     <ClInclude Include="Programs\xwLights.h">
       <Filter>Source Files\Programs\SceneObjects</Filter>
+    </ClInclude>
+    <ClInclude Include="Programs\xwHelper.h">
+      <Filter>Source Files\Programs\Helpers</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

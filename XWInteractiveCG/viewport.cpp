@@ -40,6 +40,7 @@ using namespace cy;
 
 #include "xwCamera.h";
 #include "xwLights.h";
+#include "xwHelper.h";
 
 //-------------------------------------------------------------------------------
 
@@ -114,6 +115,8 @@ Light ambientLight = Light();
 PointLight pointLight0 = PointLight();
 DirectionalLight dirLight0 = DirectionalLight();
 
+#define POINTLIGHT0_ROTATION_SPEED 0.004f
+
 //-------------------------------------------------------------------------------
 
 Camera* baseCamera = nullptr;
@@ -176,8 +179,9 @@ void ShowViewport(int argc, char* argv[]) {
 	baseCamera->SetAspect((float)screenSize[0] / (float)screenSize[1]);
 
 	ambientLight.SetIntensity(.15f);
-	pointLight0.SetPosition(Vec3f(-20, 20, 0));
+	pointLight0.SetPosition(Vec3f(0, 0, 40));
 	pointLight0.SetIntensity(Vec3f(1, .5f, .5f));
+	pointLight0.SetRotation(Vec2f(-Pi<float>() / 3, Pi<float>() / 3));
 
 	renderMode = XW_RENDER_TRIANGLES;
 
@@ -304,7 +308,6 @@ void GlutKeyboard(unsigned char key, int x, int y) {
 	case 'r':
 	case 'R':
 		baseCamera->Reset();
-		printf("R, %d, %d\n", x, y);
 		break;
 	case 'p':
 	case 'P':
@@ -369,7 +372,8 @@ void GlutMouseDrag(int x, int y) {
 		mouseMove.y *= -1;
 		if (mouseStates[GLUT_LEFT_BUTTON] == GLUT_DOWN) {
 			if (specialKeyStates[GLUT_KEY_CTRL_L] * specialKeyStates[GLUT_KEY_CTRL_R] == GLUT_DOWN) {
-				printf("Light move!\n");
+				Vec2f pointLight0Rotate = mouseMove * POINTLIGHT0_ROTATION_SPEED;
+				pointLight0.Rotate(pointLight0Rotate);
 			}
 			else {
 				Vec2f cameraRotate = mouseMove * CAMERA_ROTATION_SPEED;
