@@ -9,7 +9,6 @@
 ///
 //-------------------------------------------------------------------------------
 
-#include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
@@ -62,6 +61,7 @@ GLSLProgram* baseProgram;
 char uniformNames[500] = {
 	"worldToClampMatrix"
 	" objectToWorldMatrix"
+	" objectNormalToWorldMatrix"
 	" glossiness"
 	" diffuseColor"
 	" specularColor"
@@ -150,7 +150,7 @@ void ShowViewport(int argc, char* argv[]) {
 	// initialize scene data
 	baseObjectPosition = Vec3f(0, 0, 0);
 	baseObjectRotation = Vec3f(0, 0, 0);
-	baseObjectScale = Vec3f(1, 1, 1);
+	baseObjectScale = Vec3f(.8f, 1.8f, .8f);
 
 	baseObjectGlossiness = 20;
 	baseObjectDiffuseColor = Vec3f(.3f, .6f, .9f);
@@ -240,6 +240,11 @@ void GlutDisplay() {
 		Matrix4f::RotationXYZ(-Pi<float>() / 2, 0, 0) *
 		Matrix4f::Translation(-baseObjectCenter);
 
+	Matrix3f objectNormalToWorldMatrix = 
+		Matrix3f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) *
+		Matrix3f::Scale(baseObjectScale).GetInverse() *
+		Matrix3f::RotationXYZ(-Pi<float>() / 2, 0, 0);
+
 	Matrix4f WorldToViewMatrix =
 		baseCamera->WorldToViewMatrix();
 
@@ -256,6 +261,7 @@ void GlutDisplay() {
 
 	baseProgram->SetUniformMatrix4("worldToClampMatrix", &worldToClampMatrix.cell[0]);
 	baseProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
+	baseProgram->SetUniformMatrix3("objectNormalToWorldMatrix", &objectNormalToWorldMatrix.cell[0]);
 
 	baseProgram->SetUniform1("glossiness", 1, &baseObjectGlossiness);
 	baseProgram->SetUniform3("diffuseColor", 1, baseObjectDiffuseColor.Elements());
