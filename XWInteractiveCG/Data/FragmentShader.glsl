@@ -1,6 +1,6 @@
-# version 330 core
+#version 330 core
 
-out layout (location = 0) vec4 daColor;
+layout (location = 0) out vec4 daColor;
 
 in vec3 worldNormal;
 in vec3 worldPosition;

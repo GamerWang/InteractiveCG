@@ -1,7 +1,7 @@
 #version 330 core
 
-in layout (location = 0) vec3 pos;
-in layout (location = 1) vec3 normal;
+layout (location = 0) in vec3 pos;
+layout (location = 1) in vec3 normal;
 
 out vec3 worldNormal;
 out vec3 worldPosition;
