@@ -150,7 +150,7 @@ void ShowViewport(int argc, char* argv[]) {
 	// initialize scene data
 	baseObjectPosition = Vec3f(0, 0, 0);
 	baseObjectRotation = Vec3f(0, 0, 0);
-	baseObjectScale = Vec3f(.8f, 1.8f, .8f);
+	baseObjectScale = Vec3f(1.0f, 1.0f, 1.0f);
 
 	baseObjectGlossiness = 20;
 	baseObjectDiffuseColor = Vec3f(.3f, .6f, .9f);
@@ -415,7 +415,13 @@ void SendDataToOpenGL(char objName[]) {
 	strcat(objPath, objName);
 	
 	targetObject = new cyTriMesh();
-	if (targetObject->LoadFromFileObj(objPath, false)) {
+	if (targetObject->LoadFromFileObj(objPath, true)) {
+		// process material data
+		if (targetObject->NM() > 0) {
+			cyTriMesh::Mtl* materials = &targetObject->M(0);
+			printf("has material: %s\n", materials->name);
+		}
+
 		// generate buffer-ready data
 		Vec3f* objVertices = new Vec3f[targetObject->NVN()];
 		Vec3f* objNormals = new Vec3f[targetObject->NVN()];
