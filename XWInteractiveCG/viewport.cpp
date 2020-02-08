@@ -39,6 +39,7 @@ using namespace cy;
 
 #include "xwCamera.h";
 #include "xwLights.h";
+#include "xwMaterial.h";
 #include "xwHelper.h";
 
 //-------------------------------------------------------------------------------
@@ -188,7 +189,7 @@ void ShowViewport(int argc, char* argv[]) {
 	// basic settings for the viewport
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
-	glutInitWindowPosition(50, 50);
+	glutInitWindowPosition(800, 50);
 	glutInitWindowSize(screenSize[0], screenSize[1]);
 	glutCreateWindow("XW Renderer - CS6610");
 	glutDisplayFunc(GlutDisplay);
@@ -420,6 +421,11 @@ void SendDataToOpenGL(char objName[]) {
 		if (targetObject->NM() > 0) {
 			cyTriMesh::Mtl* materials = &targetObject->M(0);
 			printf("has material: %s\n", materials->name);
+			printf("Diffuse texture map: %s\n", materials->map_Kd.data);
+			printf("Diffuse color: %f, %f, %f\n", materials->Kd[0], materials->Kd[1], materials->Kd[2]);
+			printf("Specular texture map: %s\n", materials->map_Ks.data);
+			printf("Bump texture map: %s\n", materials->map_bump.data);
+			printf("Illumination model: %d\n", materials->Ni);
 		}
 
 		// generate buffer-ready data
