@@ -28,7 +28,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
@@ -146,6 +146,7 @@ xcopy $(SolutionDir)$(ProjectName)\Data $(targetDir)Data\ /Y</Command>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Programs\lodepng.cpp" />
     <ClCompile Include="viewport.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -159,9 +160,11 @@ xcopy $(SolutionDir)$(ProjectName)\Data $(targetDir)Data\ /Y</Command>
     <ClInclude Include="Programs\cyPoint.h" />
     <ClInclude Include="Programs\cyTriMesh.h" />
     <ClInclude Include="Programs\cyVector.h" />
+    <ClInclude Include="Programs\lodepng.h" />
     <ClInclude Include="Programs\xwHelper.h" />
     <ClInclude Include="Programs\xwLights.h" />
     <ClInclude Include="Programs\xwCamera.h" />
+    <ClInclude Include="Programs\xwMaterial.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

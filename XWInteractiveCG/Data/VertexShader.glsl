@@ -2,7 +2,9 @@
 
 layout (location = 0) in vec3 pos;
 layout (location = 1) in vec3 normal;
+layout (location = 2) in vec3 texturecoord;
 
+out vec2 texcoord;
 out vec3 worldNormal;
 out vec3 worldPosition;
 
@@ -13,7 +15,8 @@ uniform mat4 worldToClampMatrix;
 uniform vec3 pointLight0pos;
 
 void main(){
-//	worldNormal = vec3(objectToWorldMatrix * vec4(normal, 0.0));
+	texcoord = vec2(texturecoord);
+
 	worldNormal = objectNormalToWorldMatrix * normal, 0.0;
 
 	vec4 v = vec4(pos, 1.0);

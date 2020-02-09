@@ -31,6 +31,9 @@
     <Filter Include="Source Files\Programs\xwClasses">
       <UniqueIdentifier>{2b1ee7c1-7865-41d4-8773-2797fd62086a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Programs\LodePNG">
+      <UniqueIdentifier>{daa7e91c-4b1d-47dd-af9d-69d4f9d6045a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -38,6 +41,9 @@
     </ClCompile>
     <ClCompile Include="viewport.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Programs\lodepng.cpp">
+      <Filter>Source Files\Programs\LodePNG</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -75,6 +81,12 @@
     </ClInclude>
     <ClInclude Include="Programs\xwHelper.h">
       <Filter>Source Files\Programs\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="Programs\lodepng.h">
+      <Filter>Source Files\Programs\LodePNG</Filter>
+    </ClInclude>
+    <ClInclude Include="Programs\xwMaterial.h">
+      <Filter>Source Files\Programs\xwClasses</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

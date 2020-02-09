@@ -56,6 +56,8 @@ char fragmentShaderPath[30] = "Data\\FragmentShader.glsl";
 GLSLShader* vertexShader;
 GLSLShader* fragmentShader;
 GLSLProgram* baseProgram;
+GLTexture2D* baseObjectDiffuseTexture1;
+GLTexture2D* baseObjectSpecularTexture1;
 
 //-------------------------------------------------------------------------------
 
@@ -69,6 +71,7 @@ char uniformNames[500] = {
 	" cameraPosition"
 	" pointLight0pos"
 	" pointLight0Intensity"
+	" diffuseTexture"
 };
 
 //-------------------------------------------------------------------------------
@@ -76,6 +79,7 @@ char uniformNames[500] = {
 GLuint baseVertexArrayObjectID;
 GLuint baseVertexBufferID;
 GLuint baseVertexNormalBufferID;
+GLuint baseVertexTexcoordBufferID;
 GLuint baseIndexBufferID;
 GLuint baseNumIndices;
 
@@ -105,6 +109,9 @@ Vec3f baseObjectRotation;
 Vec3f baseObjectScale;
 Vec3f baseObjectCenter;
 
+//-------------------------------------------------------------------------------
+
+Material* baseObjectMaterial;
 Vec3f baseObjectColor;
 Vec3f baseObjectDiffuseColor;
 Vec3f baseObjectSpecularColor;
@@ -123,6 +130,10 @@ DirectionalLight dirLight0 = DirectionalLight();
 Camera* baseCamera = nullptr;
 #define CAMERA_ROTATION_SPEED 0.001f
 #define CAMERA_MOVE_SPEED 0.03f
+
+//-------------------------------------------------------------------------------||TEMP variables
+
+GLuint diffuseID;
 
 //-------------------------------------------------------------------------------
 
@@ -153,6 +164,7 @@ void ShowViewport(int argc, char* argv[]) {
 	baseObjectRotation = Vec3f(0, 0, 0);
 	baseObjectScale = Vec3f(1.0f, 1.0f, 1.0f);
 
+	baseObjectMaterial = new Material();
 	baseObjectGlossiness = 20;
 	baseObjectDiffuseColor = Vec3f(.3f, .6f, .9f);
 	baseObjectSpecularColor = Vec3f(.9f);
@@ -224,7 +236,7 @@ void ShowViewport(int argc, char* argv[]) {
 	InstallShaders();
 
 	glutMainLoop();
-}
+} 
 
 //-------------------------------------------------------------------------------
 
@@ -272,6 +284,10 @@ void GlutDisplay() {
 	baseProgram->SetUniform3("ambientLight", 1, ambientLight.GetIntensity().Elements());
 	baseProgram->SetUniform3("pointLight0pos", 1, pointLight0.GetPosition().Elements());
 	baseProgram->SetUniform3("pointLight0Intensity", 1, pointLight0.GetIntensity().Elements());
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, diffuseID);
+	baseProgram->SetUniform("diffuseTexture", 0);
 
 	switch (renderMode)
 	{
@@ -412,72 +428,145 @@ void GlutReshapeWindow(int width, int height) {
 
 void SendDataToOpenGL(char objName[]) {
 	// read teapot data
-	char objPath[30] = "Data\\";
+	char objPath[50] = "Data\\";
 	strcat(objPath, objName);
 	
 	targetObject = new cyTriMesh();
 	if (targetObject->LoadFromFileObj(objPath, true)) {
 		// process material data
 		if (targetObject->NM() > 0) {
-			cyTriMesh::Mtl* materials = &targetObject->M(0);
-			printf("has material: %s\n", materials->name);
-			printf("Diffuse texture map: %s\n", materials->map_Kd.data);
-			printf("Diffuse color: %f, %f, %f\n", materials->Kd[0], materials->Kd[1], materials->Kd[2]);
-			printf("Specular texture map: %s\n", materials->map_Ks.data);
-			printf("Bump texture map: %s\n", materials->map_bump.data);
-			printf("Illumination model: %d\n", materials->Ni);
+			cyTriMesh::Mtl* material = &targetObject->M(0);
+			baseObjectMaterial->Initialize(material);
 		}
 
 		// generate buffer-ready data
-		Vec3f* objVertices = new Vec3f[targetObject->NVN()];
-		Vec3f* objNormals = new Vec3f[targetObject->NVN()];
+		int maxBufferID = 0;
+		unsigned int maxBufferCount = 0;
 
-		for (int i = 0; i < targetObject->NVN(); i++) {
-			objNormals[i] = targetObject->VN(i);
+		unsigned int vertexNumber = targetObject->NV();
+		unsigned int normalNumber = targetObject->NVN();
+		unsigned int texcoordNumber = targetObject->NVT();
+
+		if (vertexNumber > normalNumber) {
+			maxBufferID = 1;
+			maxBufferCount = vertexNumber;
+		}
+		else {
+			maxBufferID = 2;
+			maxBufferCount = normalNumber;
+		}
+		if (texcoordNumber > maxBufferCount) {
+			maxBufferID = 3;
+			maxBufferCount = texcoordNumber;
 		}
 
-		//GLushort* indices = new GLushort[targetObject->NF() * 3];
+		Vec3f* objVertices = new Vec3f[maxBufferCount];
+		Vec3f* objNormals = new Vec3f[maxBufferCount];
+		Vec3f* objTexcoords = new Vec3f[maxBufferCount];
+
 		unsigned int* objIndices = new unsigned int[targetObject->NF() * 3];
 		for (int i = 0; i < targetObject->NF(); i++) {
-			TriMesh::TriFace currentNormalFace = targetObject->FN(i);
-			unsigned int v0 = currentNormalFace.v[0];
-			unsigned int v1 = currentNormalFace.v[1];
-			unsigned int v2 = currentNormalFace.v[2];
+			unsigned int v0 = 0;
+			unsigned int v1 = 0;
+			unsigned int v2 = 0;
+			TriMesh::TriFace currentFace;
+			switch (maxBufferID) {
+			case 1:
+				currentFace = targetObject->F(i);
+				break;
+			case 2:
+				currentFace = targetObject->FN(i);
+				break;
+			case 3:
+				currentFace = targetObject->FT(i);
+				break;
+			default:
+				break;
+			}
+
+			v0 = currentFace.v[0];
+			v1 = currentFace.v[1];
+			v2 = currentFace.v[2];
+
 			objIndices[i * 3] = v0;
 			objIndices[i * 3 + 1] = v1;
 			objIndices[i * 3 + 2] = v2;
+			
 			objVertices[v0] = targetObject->GetVec(i, Vec3f(1, 0, 0));
 			objVertices[v1] = targetObject->GetVec(i, Vec3f(0, 1, 0));
 			objVertices[v2] = targetObject->GetVec(i, Vec3f(0, 0, 1));
+
+			objNormals[v0] = targetObject->GetNormal(i, Vec3f(1, 0, 0));
+			objNormals[v1] = targetObject->GetNormal(i, Vec3f(0, 1, 0));
+			objNormals[v2] = targetObject->GetNormal(i, Vec3f(0, 0, 1));
+
+			objTexcoords[v0] = targetObject->GetTexCoord(i, Vec3f(1, 0, 0));
+			objTexcoords[v1] = targetObject->GetTexCoord(i, Vec3f(0, 1, 0));
+			objTexcoords[v2] = targetObject->GetTexCoord(i, Vec3f(0, 0, 1));
 		}
 		baseNumIndices = targetObject->NF() * 3;
 
 		// send vertex data & index data to buffers
 		glGenBuffers(1, &baseVertexBufferID);
 		glBindBuffer(GL_ARRAY_BUFFER, baseVertexBufferID);
-		glBufferData(GL_ARRAY_BUFFER, targetObject->NVN() * sizeof(Vec3f), objVertices, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, maxBufferCount * sizeof(Vec3f), objVertices, GL_STATIC_DRAW);
 
 		glGenBuffers(1, &baseVertexNormalBufferID);
 		glBindBuffer(GL_ARRAY_BUFFER, baseVertexNormalBufferID);
-		glBufferData(GL_ARRAY_BUFFER, targetObject->NVN() * sizeof(Vec3f), objNormals, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, maxBufferCount * sizeof(Vec3f), objNormals, GL_STATIC_DRAW);
+
+		glGenBuffers(1, &baseVertexTexcoordBufferID);
+		glBindBuffer(GL_ARRAY_BUFFER, baseVertexTexcoordBufferID);
+		glBufferData(GL_ARRAY_BUFFER, maxBufferCount * sizeof(Vec3f), objTexcoords, GL_STATIC_DRAW);
 
 		glGenBuffers(1, &baseIndexBufferID);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, baseIndexBufferID);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, baseNumIndices * sizeof(unsigned int), objIndices, GL_STATIC_DRAW);
 
 		delete[] objVertices;
+		delete[] objNormals;
+		delete[] objTexcoords;
 		delete[] objIndices;
+
+
+		// temp way of passing the texture data
+		{
+			Material::Texture diffuseTexture = baseObjectMaterial->GetDiffuseTextureData();
+			Material::Texture specularTexture = baseObjectMaterial->GetSpecularTextureData();
+
+			// diffuse part
+			glGenTextures(1, &diffuseID);
+			glBindTexture(GL_TEXTURE_2D, diffuseID);
+
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); // repeat on x direction
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); // repeat on y direction
+
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, diffuseTexture.width, diffuseTexture.height, 0, 
+				GL_RGBA, GL_UNSIGNED_BYTE, diffuseTexture.textureData.data());
+
+			glGenerateMipmap(GL_TEXTURE_2D);
+			glBindTexture(GL_TEXTURE_2D, 0); // unbind texture when done
+		}
+
 		
 		// setup vertex arrays
 		glGenVertexArrays(1, &baseVertexArrayObjectID);
 		glBindVertexArray(baseVertexArrayObjectID);
 		glEnableVertexAttribArray(0);
 		glEnableVertexAttribArray(1);
+		glEnableVertexAttribArray(2);
 		glBindBuffer(GL_ARRAY_BUFFER, baseVertexBufferID);
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3f), 0);
 		glBindBuffer(GL_ARRAY_BUFFER, baseVertexNormalBufferID);
 		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3f), 0);
+		glBindBuffer(GL_ARRAY_BUFFER, baseVertexTexcoordBufferID);
+		glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3f), 0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, baseIndexBufferID);
+
+		glBindVertexArray(0); // unbind vertex array when done
 	}
 	else {
 		return;
