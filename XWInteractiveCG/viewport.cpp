@@ -78,8 +78,6 @@ char uniformNames[500] = {
 
 GLuint baseVertexArrayObjectID;
 GLuint baseVertexBufferID;
-GLuint baseVertexNormalBufferID;
-GLuint baseVertexTexcoordBufferID;
 GLuint baseIndexBufferID;
 GLuint baseNumIndices;
 
@@ -112,6 +110,8 @@ Vec3f baseObjectCenter;
 //-------------------------------------------------------------------------------
 
 Material* baseObjectMaterial;
+cyGLTexture2D* baseObjectDiffuse;
+cyGLTexture2D* baseObjectSpecular;
 Vec3f baseObjectColor;
 Vec3f baseObjectDiffuseColor;
 Vec3f baseObjectSpecularColor;
@@ -132,8 +132,6 @@ Camera* baseCamera = nullptr;
 #define CAMERA_MOVE_SPEED 0.03f
 
 //-------------------------------------------------------------------------------||TEMP variables
-
-GLuint diffuseID;
 
 //-------------------------------------------------------------------------------
 
@@ -193,7 +191,7 @@ void ShowViewport(int argc, char* argv[]) {
 
 	ambientLight.SetIntensity(.15f);
 	pointLight0.SetPosition(Vec3f(0, 0, 40));
-	pointLight0.SetIntensity(Vec3f(1, .5f, .5f));
+	pointLight0.SetIntensity(Vec3f(.7f));
 	pointLight0.SetRotation(Vec2f(-Pi<float>() / 3, Pi<float>() / 3));
 
 	renderMode = XW_RENDER_TRIANGLES;
@@ -285,9 +283,10 @@ void GlutDisplay() {
 	baseProgram->SetUniform3("pointLight0pos", 1, pointLight0.GetPosition().Elements());
 	baseProgram->SetUniform3("pointLight0Intensity", 1, pointLight0.GetIntensity().Elements());
 
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, diffuseID);
+	baseObjectDiffuse->Bind(0);
 	baseProgram->SetUniform("diffuseTexture", 0);
+	baseObjectSpecular->Bind(1);
+	baseProgram->SetUniform("specularTexture", 1);
 
 	switch (renderMode)
 	{
@@ -433,127 +432,75 @@ void SendDataToOpenGL(char objName[]) {
 	
 	targetObject = new cyTriMesh();
 	if (targetObject->LoadFromFileObj(objPath, true)) {
+		// process vertex data
+		{
+			baseNumIndices = targetObject->NF() * 3;
+			Vertex* objVertices = new Vertex[baseNumIndices];
+			unsigned int* objIndices = new unsigned int[baseNumIndices];
+
+			for (int i = 0; i < targetObject->NF(); i++) {
+				Vertex vertex = Vertex();
+
+				vertex.Position  = targetObject->GetVec(i, Vec3f(1, 0, 0));
+				vertex.Normal = targetObject->GetNormal(i, Vec3f(1, 0, 0));
+				vertex.Texcoords = targetObject->GetTexCoord(i, Vec3f(1, 0, 0)).XY() * Vec2f(1, -1); // flip v direciton to get correct result
+				objVertices[i * 3] = vertex;
+
+				vertex = Vertex();
+				vertex.Position = targetObject->GetVec(i, Vec3f(0, 1, 0));
+				vertex.Normal = targetObject->GetNormal(i, Vec3f(0, 1, 0));
+				vertex.Texcoords = targetObject->GetTexCoord(i, Vec3f(0, 1, 0)).XY() * Vec2f(1, -1);
+				objVertices[i * 3 + 1] = vertex;
+
+				vertex = Vertex();
+				vertex.Position = targetObject->GetVec(i, Vec3f(0, 0, 1));
+				vertex.Normal = targetObject->GetNormal(i, Vec3f(0, 0, 1));
+				vertex.Texcoords = targetObject->GetTexCoord(i, Vec3f(0, 0, 1)).XY() * Vec2f(1, -1);
+				objVertices[i * 3 + 2] = vertex;
+
+				objIndices[i * 3] = i * 3;
+				objIndices[i * 3 + 1] = i * 3 + 1;
+				objIndices[i * 3 + 2] = i * 3 + 2;
+			}
+
+			glGenBuffers(1, &baseVertexBufferID);
+			glBindBuffer(GL_ARRAY_BUFFER, baseVertexBufferID);
+			glBufferData(GL_ARRAY_BUFFER, baseNumIndices * sizeof(Vertex), objVertices, GL_STATIC_DRAW);
+
+			glGenBuffers(1, &baseIndexBufferID);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, baseIndexBufferID);
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, baseNumIndices * sizeof(unsigned int), objIndices, GL_STATIC_DRAW);
+
+			delete[] objVertices;
+			delete[] objIndices;
+		}
+
 		// process material data
 		if (targetObject->NM() > 0) {
 			cyTriMesh::Mtl* material = &targetObject->M(0);
 			baseObjectMaterial->Initialize(material);
-		}
+			// passing data
+			{
+				Material::Texture diffuseTexture = baseObjectMaterial->GetDiffuseTextureData();
+				baseObjectDiffuse = new cyGLTexture2D();
+				baseObjectDiffuse->Initialize();
+				baseObjectDiffuse->SetWrappingMode(GL_REPEAT, GL_REPEAT);
+				baseObjectDiffuse->SetImage(
+					GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, 
+					diffuseTexture.textureData.data(), diffuseTexture.width, diffuseTexture.height, 0);
+				baseObjectDiffuse->BuildMipmaps();
 
-		// generate buffer-ready data
-		int maxBufferID = 0;
-		unsigned int maxBufferCount = 0;
-
-		unsigned int vertexNumber = targetObject->NV();
-		unsigned int normalNumber = targetObject->NVN();
-		unsigned int texcoordNumber = targetObject->NVT();
-
-		if (vertexNumber > normalNumber) {
-			maxBufferID = 1;
-			maxBufferCount = vertexNumber;
-		}
-		else {
-			maxBufferID = 2;
-			maxBufferCount = normalNumber;
-		}
-		if (texcoordNumber > maxBufferCount) {
-			maxBufferID = 3;
-			maxBufferCount = texcoordNumber;
-		}
-
-		Vec3f* objVertices = new Vec3f[maxBufferCount];
-		Vec3f* objNormals = new Vec3f[maxBufferCount];
-		Vec3f* objTexcoords = new Vec3f[maxBufferCount];
-
-		unsigned int* objIndices = new unsigned int[targetObject->NF() * 3];
-		for (int i = 0; i < targetObject->NF(); i++) {
-			unsigned int v0 = 0;
-			unsigned int v1 = 0;
-			unsigned int v2 = 0;
-			TriMesh::TriFace currentFace;
-			switch (maxBufferID) {
-			case 1:
-				currentFace = targetObject->F(i);
-				break;
-			case 2:
-				currentFace = targetObject->FN(i);
-				break;
-			case 3:
-				currentFace = targetObject->FT(i);
-				break;
-			default:
-				break;
-			}
-
-			v0 = currentFace.v[0];
-			v1 = currentFace.v[1];
-			v2 = currentFace.v[2];
-
-			objIndices[i * 3] = v0;
-			objIndices[i * 3 + 1] = v1;
-			objIndices[i * 3 + 2] = v2;
-			
-			objVertices[v0] = targetObject->GetVec(i, Vec3f(1, 0, 0));
-			objVertices[v1] = targetObject->GetVec(i, Vec3f(0, 1, 0));
-			objVertices[v2] = targetObject->GetVec(i, Vec3f(0, 0, 1));
-
-			objNormals[v0] = targetObject->GetNormal(i, Vec3f(1, 0, 0));
-			objNormals[v1] = targetObject->GetNormal(i, Vec3f(0, 1, 0));
-			objNormals[v2] = targetObject->GetNormal(i, Vec3f(0, 0, 1));
-
-			objTexcoords[v0] = targetObject->GetTexCoord(i, Vec3f(1, 0, 0));
-			objTexcoords[v1] = targetObject->GetTexCoord(i, Vec3f(0, 1, 0));
-			objTexcoords[v2] = targetObject->GetTexCoord(i, Vec3f(0, 0, 1));
-			if (objTexcoords[v0].x > 1.5) {
-				printf("find big texcoord: %f, %f\n", objTexcoords[v0].x, objTexcoords[v0].y);
+				Material::Texture specularTexture = baseObjectMaterial->GetSpecularTextureData();
+				baseObjectSpecular = new cyGLTexture2D();
+				baseObjectSpecular->Initialize();
+				baseObjectSpecular->SetWrappingMode(GL_REPEAT, GL_REPEAT);
+				baseObjectSpecular->SetImage(
+					GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE,
+					specularTexture.textureData.data(), specularTexture.width, specularTexture.height, 0);
+				baseObjectSpecular->BuildMipmaps();
+				glBindTexture(GL_TEXTURE_2D, 0);
 			}
 		}
-		baseNumIndices = targetObject->NF() * 3;
-
-		// send vertex data & index data to buffers
-		glGenBuffers(1, &baseVertexBufferID);
-		glBindBuffer(GL_ARRAY_BUFFER, baseVertexBufferID);
-		glBufferData(GL_ARRAY_BUFFER, maxBufferCount * sizeof(Vec3f), objVertices, GL_STATIC_DRAW);
-
-		glGenBuffers(1, &baseVertexNormalBufferID);
-		glBindBuffer(GL_ARRAY_BUFFER, baseVertexNormalBufferID);
-		glBufferData(GL_ARRAY_BUFFER, maxBufferCount * sizeof(Vec3f), objNormals, GL_STATIC_DRAW);
-
-		glGenBuffers(1, &baseVertexTexcoordBufferID);
-		glBindBuffer(GL_ARRAY_BUFFER, baseVertexTexcoordBufferID);
-		glBufferData(GL_ARRAY_BUFFER, maxBufferCount * sizeof(Vec3f), objTexcoords, GL_STATIC_DRAW);
-
-		glGenBuffers(1, &baseIndexBufferID);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, baseIndexBufferID);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, baseNumIndices * sizeof(unsigned int), objIndices, GL_STATIC_DRAW);
-
-		delete[] objVertices;
-		delete[] objNormals;
-		delete[] objTexcoords;
-		delete[] objIndices;
-
-
-		// temp way of passing the texture data
-		{
-			Material::Texture diffuseTexture = baseObjectMaterial->GetDiffuseTextureData();
-			Material::Texture specularTexture = baseObjectMaterial->GetSpecularTextureData();
-
-			// diffuse part
-			glGenTextures(1, &diffuseID);
-			glBindTexture(GL_TEXTURE_2D, diffuseID);
-
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); // repeat on x direction
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); // repeat on y direction
-
-			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, diffuseTexture.width, diffuseTexture.height, 0, 
-				GL_RGBA, GL_UNSIGNED_BYTE, diffuseTexture.textureData.data());
-
-			glGenerateMipmap(GL_TEXTURE_2D);
-			glBindTexture(GL_TEXTURE_2D, 0); // unbind texture when done
-		}
-
 		
 		// setup vertex arrays
 		glGenVertexArrays(1, &baseVertexArrayObjectID);
@@ -562,13 +509,10 @@ void SendDataToOpenGL(char objName[]) {
 		glEnableVertexAttribArray(1);
 		glEnableVertexAttribArray(2);
 		glBindBuffer(GL_ARRAY_BUFFER, baseVertexBufferID);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3f), 0);
-		glBindBuffer(GL_ARRAY_BUFFER, baseVertexNormalBufferID);
-		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3f), 0);
-		glBindBuffer(GL_ARRAY_BUFFER, baseVertexTexcoordBufferID);
-		glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3f), 0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (char*)(sizeof(float) * 3));
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (char*)(sizeof(float) * 6));
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, baseIndexBufferID);
-
 		glBindVertexArray(0); // unbind vertex array when done
 	}
 	else {

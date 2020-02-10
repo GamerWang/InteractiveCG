@@ -17,6 +17,7 @@ uniform vec3 pointLight0Intensity;
 uniform vec3 pointLight0pos;
 
 uniform sampler2D diffuseTexture;
+uniform sampler2D specularTexture;
 
 void main(){
 	vec3 worldNml = normalize(worldNormal);
@@ -31,6 +32,7 @@ void main(){
 
 	// sample diffuse texture color
 	vec4 diffuseTextureColor = texture(diffuseTexture, texcoord);
+	vec4 specularTextureColor = texture(specularTexture, texcoord);
 
 	// handling pointLight0
 	// diffuse part
@@ -40,14 +42,13 @@ void main(){
 	diffuse += pointLight0geoTerm * pointLight0Intensity;
 	diffuse *= vec3(diffuseTextureColor);
 
-
 	// specular part
 	vec3 specular = vec3(0);
 	float specularTerm = dot(worldNml, pointLight0HalfDir);
 	specularTerm = clamp(specularTerm, 0, 1);
 	specularTerm = pow(specularTerm, glossiness);
 	specular += specularTerm * pointLight0Intensity;
-	specular *= specularColor;
+	specular *= vec3(specularTextureColor);
 
 	vec3 ambient = ambientLight * vec3(diffuseTextureColor);
 
