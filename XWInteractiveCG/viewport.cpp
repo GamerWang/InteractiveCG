@@ -503,6 +503,9 @@ void SendDataToOpenGL(char objName[]) {
 			objTexcoords[v0] = targetObject->GetTexCoord(i, Vec3f(1, 0, 0));
 			objTexcoords[v1] = targetObject->GetTexCoord(i, Vec3f(0, 1, 0));
 			objTexcoords[v2] = targetObject->GetTexCoord(i, Vec3f(0, 0, 1));
+			if (objTexcoords[v0].x > 1.5) {
+				printf("find big texcoord: %f, %f\n", objTexcoords[v0].x, objTexcoords[v0].y);
+			}
 		}
 		baseNumIndices = targetObject->NF() * 3;
 
