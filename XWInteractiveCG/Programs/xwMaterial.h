@@ -53,15 +53,6 @@ public:
 //-------------------------------------------------------------------------------
 
 inline void Material::Initialize(cyTriMesh::Mtl* mtl) {
-	//printf("Initialize material object!\n");
-	//printf("has mtl: %s\n", mtl->name);
-	//printf("Diffuse texture map: %s\n", mtl->map_Kd.data);
-	//printf("Diffuse color: %f, %f, %f\n", mtl->Kd[0], mtl->Kd[1], mtl->Kd[2]);
-	//printf("Specular texture map: %s\n", mtl->map_Ks.data);
-	//printf("Specular color: %f, %f, %f\n", mtl->Ks[0], mtl->Ks[1], mtl->Ks[2]);
-	//printf("Bump texture map: %s\n", mtl->map_bump.data);
-	//printf("Illumination model: %d\n", mtl->Ni);
-
 	diffuseTexture = Texture(mtl->map_Kd.data);
 	specularTexture = Texture(mtl->map_Ks.data);
 }
