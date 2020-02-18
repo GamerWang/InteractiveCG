@@ -14,6 +14,13 @@ struct Vertex {
 	Vec3f Position;
 	Vec3f Normal;
 	Vec2f Texcoords;
+
+	Vertex() {}
+	Vertex(Vec3f p, Vec3f n, Vec2f t) {
+		Position = p;
+		Normal = n;
+		Texcoords = t;
+	}
 };
 
 //-------------------------------------------------------------------------------
@@ -83,5 +90,31 @@ void TextureIDConverter(int id, GLint& outID) {
 		break;
 	}
 }
+
+//-------------------------------------------------------------------------------
+//	geometry classes
+//-------------------------------------------------------------------------------
+
+class Plane {
+protected:
+	Vertex vertices[4];
+	unsigned int indices[6];
+public:
+	Plane() {
+		vertices[0] = Vertex(Vec3f(-1, 1, 0), Vec3f(0, 0, 0), Vec2f(0, 1));
+		vertices[1] = Vertex(Vec3f(-1, -1, 0), Vec3f(0, 0, 0), Vec2f(0, 0));
+		vertices[2] = Vertex(Vec3f(1, -1, 0), Vec3f(0, 0, 0), Vec2f(1, 0));
+		vertices[3] = Vertex(Vec3f(1, 1, 0), Vec3f(0, 0, 0), Vec2f(1, 1));
+		indices[0] = 0; indices[1] = 1; indices[2] = 2;
+		indices[3] = 0; indices[4] = 2; indices[5] = 3;
+	};
+
+	Vertex* GetVertices() {
+		return vertices;
+	}
+	unsigned int* GetIndices() {
+		return indices;
+	}
+};
 
 //-------------------------------------------------------------------------------

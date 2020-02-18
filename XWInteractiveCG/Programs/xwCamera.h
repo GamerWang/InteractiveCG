@@ -54,6 +54,7 @@ public:
 		type == XW_CAMERA_PERSPECTIVE ? XW_CAMERA_ORTHOGONAL : XW_CAMERA_PERSPECTIVE; }
 	
 	Vec3f GetPosition() { return position; }
+	void SetPosition(Vec3f p) { position = p; }
 
 	void RotateCameraByLocal(Vec2f rotation);
 	void RotateCameraByOrigin(Vec2f rotation);

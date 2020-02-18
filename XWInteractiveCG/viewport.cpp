@@ -56,8 +56,11 @@ char fragmentShaderPath[30] = "Data\\FragmentShader.glsl";
 GLSLShader* vertexShader;
 GLSLShader* fragmentShader;
 GLSLProgram* baseProgram;
-GLTexture2D* baseObjectDiffuseTexture1;
-GLTexture2D* baseObjectSpecularTexture1;
+GLRenderTexture2D* baseSceneBuffer;
+
+char RTextureVertShaderPath[30] = "Data\\SV_Plane.glsl";
+char RTextureFragShaderPath[30] = "Data\\SF_Plane.glsl";
+GLSLProgram* RTextureProgram;
 
 //-------------------------------------------------------------------------------
 
@@ -74,12 +77,20 @@ char uniformNames[500] = {
 	" diffuseTexture"
 };
 
+char planeSceneUniformNames[500] = {
+	"objectToClampMatrix"
+};
+
 //-------------------------------------------------------------------------------
 
 GLuint baseVertexArrayObjectID;
 GLuint baseVertexBufferID;
 GLuint baseIndexBufferID;
 GLuint baseNumIndices;
+
+GLuint RTextureVertexArrayObjectID;
+GLuint RTexturePlaneVertexBufferID;
+GLuint RTexturePlaneIndexBufferID;
 
 //-------------------------------------------------------------------------------
 
@@ -128,11 +139,13 @@ DirectionalLight dirLight0 = DirectionalLight();
 //-------------------------------------------------------------------------------
 
 Camera* baseCamera = nullptr;
+Camera* planeSceneCamera = nullptr;
 #define CAMERA_ROTATION_SPEED 0.001f
 #define CAMERA_MOVE_SPEED 0.03f
 
 //-------------------------------------------------------------------------------||TEMP variables
-
+GLuint framebuffer;
+GLuint textureColorBuffer;
 //-------------------------------------------------------------------------------
 
 void GlutDisplay();
@@ -147,8 +160,9 @@ void GlutReshapeWindow(int width, int height);
 //-------------------------------------------------------------------------------
 
 void SendDataToOpenGL(char objName[]);
-void InstallShaders();
-void CompileShaders();
+void InstallTeapotSceneShaders();
+void CompileTeapotSceneShaders();
+void InstallPlaneSceneShaders();
 
 //-------------------------------------------------------------------------------
 
@@ -188,6 +202,10 @@ void ShowViewport(int argc, char* argv[]) {
 
 	baseCamera = new Camera();
 	baseCamera->SetAspect((float)screenSize[0] / (float)screenSize[1]);
+
+	planeSceneCamera = new Camera();
+	planeSceneCamera->SetAspect((float)screenSize[0] / (float)screenSize[1]);
+	planeSceneCamera->SetPosition(Vec3f(0, 0, 3));
 
 	ambientLight.SetIntensity(.15f);
 	pointLight0.SetPosition(Vec3f(0, 0, 40));
@@ -230,8 +248,15 @@ void ShowViewport(int argc, char* argv[]) {
 	baseObjectCenter = targetObject->GetBoundMax() + targetObject->GetBoundMin();
 	baseObjectCenter /= 2;
 
+	// initialize render texture buffer
+	baseSceneBuffer = new GLRenderTexture2D();
+	baseSceneBuffer->Initialize(true, 3, 1024, 1024);
+	baseSceneBuffer->SetTextureFilteringMode(GL_LINEAR, GL_LINEAR);
+	baseSceneBuffer->BuildTextureMipmaps();
+
 	// install shaders to opengl
-	InstallShaders();
+	InstallTeapotSceneShaders();
+	InstallPlaneSceneShaders();
 
 	glutMainLoop();
 } 
@@ -239,8 +264,11 @@ void ShowViewport(int argc, char* argv[]) {
 //-------------------------------------------------------------------------------
 
 void GlutDisplay() {
-	// compute matrices here
+	// rendering the teapot scene to target buffer
+	baseSceneBuffer->Bind();
 
+	// compute matrices here
+	glClearColor(.5f, .1f, .1f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	// send uniforms here
@@ -269,6 +297,7 @@ void GlutDisplay() {
 	}
 
 	glBindVertexArray(baseVertexArrayObjectID);
+	baseProgram->Bind();
 
 	baseProgram->SetUniformMatrix4("worldToClampMatrix", &worldToClampMatrix.cell[0]);
 	baseProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
@@ -284,9 +313,7 @@ void GlutDisplay() {
 	baseProgram->SetUniform3("pointLight0Intensity", 1, pointLight0.GetIntensity().Elements());
 
 	baseObjectDiffuse->Bind(0);
-	baseProgram->SetUniform("diffuseTexture", 0);
 	baseObjectSpecular->Bind(1);
-	baseProgram->SetUniform("specularTexture", 1);
 
 	switch (renderMode)
 	{
@@ -298,6 +325,28 @@ void GlutDisplay() {
 		glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
 		break;
 	}
+	baseSceneBuffer->Unbind();
+
+	Matrix4f PlaneSceneWorldToViewMatrix =
+		planeSceneCamera->WorldToViewMatrix();
+	if (planeSceneCamera->GetCameraType() == CameraType::XW_CAMERA_PERSPECTIVE) {
+		Matrix4f viewToProjectionMatrix = planeSceneCamera->ViewToProjectionMatrix();
+		PlaneSceneWorldToViewMatrix = viewToProjectionMatrix * PlaneSceneWorldToViewMatrix;
+	}
+	else if (planeSceneCamera->GetCameraType() == CameraType::XW_CAMERA_ORTHOGONAL) {
+		PlaneSceneWorldToViewMatrix.OrthogonalizeZ();
+	}
+
+	glClearColor(.5f, .5f, .5f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	RTextureProgram->Bind();
+	glBindVertexArray(RTextureVertexArrayObjectID);
+	baseSceneBuffer->BindTexture(2);
+
+	RTextureProgram->SetUniformMatrix4("objectToClampMatrix", &PlaneSceneWorldToViewMatrix.cell[0]);
+
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
 	glutSwapBuffers();
 }
@@ -349,10 +398,12 @@ void GlutSpecialKey(int key, int x, int y) {
 	switch (key) {
 	case GLUT_KEY_F6:
 		printf("Recompile shaders\n");
-		CompileShaders();
+		CompileTeapotSceneShaders();
 		break;
 	case GLUT_KEY_CTRL_L:
 	case GLUT_KEY_CTRL_R:
+	case GLUT_KEY_ALT_L:
+	case GLUT_KEY_ALT_R:
 		specialKeyStates[key] = GLUT_DOWN;
 		break;
 	default:
@@ -367,6 +418,8 @@ void GlutSpecialKeyUp(int key, int x, int y) {
 	{
 	case GLUT_KEY_CTRL_L:
 	case GLUT_KEY_CTRL_R:
+	case GLUT_KEY_ALT_L:
+	case GLUT_KEY_ALT_R:
 		specialKeyStates[key] = GLUT_UP;
 		break;
 	default:
@@ -397,6 +450,10 @@ void GlutMouseDrag(int x, int y) {
 				Vec2f pointLight0Rotate = mouseMove * POINTLIGHT0_ROTATION_SPEED;
 				pointLight0.Rotate(pointLight0Rotate);
 			}
+			else if (specialKeyStates[GLUT_KEY_ALT_L] * specialKeyStates[GLUT_KEY_ALT_R] == GLUT_DOWN) {
+				Vec2f cameraRotate = mouseMove * CAMERA_ROTATION_SPEED;
+				planeSceneCamera->RotateCameraByOrigin(cameraRotate);
+			}
 			else {
 				Vec2f cameraRotate = mouseMove * CAMERA_ROTATION_SPEED;
 				//baseCamera->RotateCameraByLocal(cameraRotate);
@@ -404,9 +461,15 @@ void GlutMouseDrag(int x, int y) {
 			}
 		}
 		else if (mouseStates[GLUT_RIGHT_BUTTON] == GLUT_DOWN) {
-			float cameraMoveDis = mouseMove.Dot(Vec2f(1, -1)) * CAMERA_MOVE_SPEED;
-			//baseCamera->MoveCameraAlongView(cameraMoveDis);
-			baseCamera->ScaleDistanceAlongView(cameraMoveDis);
+			if (specialKeyStates[GLUT_KEY_ALT_L] * specialKeyStates[GLUT_KEY_ALT_R] == GLUT_DOWN) {
+				float cameraMoveDis = mouseMove.Dot(Vec2f(1, -1)) * CAMERA_MOVE_SPEED;
+				planeSceneCamera->ScaleDistanceAlongView(cameraMoveDis);
+			}
+			else {
+				float cameraMoveDis = mouseMove.Dot(Vec2f(1, -1)) * CAMERA_MOVE_SPEED;
+				//baseCamera->MoveCameraAlongView(cameraMoveDis);
+				baseCamera->ScaleDistanceAlongView(cameraMoveDis);
+			}
 		}
 		else if (mouseStates[GLUT_MIDDLE_BUTTON] == GLUT_DOWN) {
 
@@ -426,6 +489,7 @@ void GlutReshapeWindow(int width, int height) {
 //-------------------------------------------------------------------------------
 
 void SendDataToOpenGL(char objName[]) {
+	// Source teapot scene data
 	// read teapot data
 	char objPath[50] = "Data\\";
 	strcat(objPath, objName);
@@ -504,6 +568,7 @@ void SendDataToOpenGL(char objName[]) {
 		
 		// setup vertex arrays
 		glGenVertexArrays(1, &baseVertexArrayObjectID);
+
 		glBindVertexArray(baseVertexArrayObjectID);
 		glEnableVertexAttribArray(0);
 		glEnableVertexAttribArray(1);
@@ -518,22 +583,43 @@ void SendDataToOpenGL(char objName[]) {
 	else {
 		return;
 	}
+
+	// Plane Scene data
+	Plane plane;
+	glGenBuffers(1, &RTexturePlaneVertexBufferID);
+	glBindBuffer(GL_ARRAY_BUFFER, RTexturePlaneVertexBufferID);
+	glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(Vertex), plane.GetVertices(), GL_STATIC_DRAW);
+
+	glGenBuffers(1, &RTexturePlaneIndexBufferID);
+	glBindBuffer(GL_ARRAY_BUFFER, RTexturePlaneIndexBufferID);
+	glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(unsigned int), plane.GetIndices(), GL_STATIC_DRAW);
+	
+	glGenVertexArrays(1, &RTextureVertexArrayObjectID);
+	glBindVertexArray(RTextureVertexArrayObjectID);
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+	glBindBuffer(GL_ARRAY_BUFFER, RTexturePlaneVertexBufferID);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (char*)(sizeof(float) * 6));
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, RTexturePlaneIndexBufferID);
+
+	glBindVertexArray(0);
 }
 //-------------------------------------------------------------------------------
 
-void InstallShaders() {
+void InstallTeapotSceneShaders() {
 	vertexShader = new GLSLShader();
 	fragmentShader = new GLSLShader();
+
 	baseProgram = new GLSLProgram();
-
-	CompileShaders();
-
+	CompileTeapotSceneShaders();
 	baseProgram->RegisterUniforms(uniformNames);
 }
 
 //-------------------------------------------------------------------------------
 
-void CompileShaders() {
+void CompileTeapotSceneShaders() {
+	// base scene shaders
 	if (vertexShader == NULL) {
 		vertexShader = new GLSLShader();
 	}
@@ -552,10 +638,40 @@ void CompileShaders() {
 	baseProgram->AttachShader(vertexShader->GetID());
 	baseProgram->AttachShader(fragmentShader->GetID());
 	baseProgram->Link();
-	baseProgram->Bind();
+
+	baseProgram->SetUniform("diffuseTexture", 0);
+	baseProgram->SetUniform("specularTexture", 1);
 
 	vertexShader->Delete();
 	fragmentShader->Delete();
+}
+
+//-------------------------------------------------------------------------------
+
+void InstallPlaneSceneShaders() {
+	vertexShader = new GLSLShader();
+	fragmentShader = new GLSLShader();
+
+	RTextureProgram = new GLSLProgram();
+	
+	if (!vertexShader->CompileFile(RTextureVertShaderPath, GL_VERTEX_SHADER)) {
+		return;
+	}
+	if (!fragmentShader->CompileFile(RTextureFragShaderPath, GL_FRAGMENT_SHADER)) {
+		return;
+	}
+
+	RTextureProgram->CreateProgram();
+	RTextureProgram->AttachShader(vertexShader->GetID());
+	RTextureProgram->AttachShader(fragmentShader->GetID());
+	RTextureProgram->Link();
+
+	RTextureProgram->SetUniform("renderTexture", 2);
+
+	vertexShader->Delete();
+	fragmentShader->Delete();
+
+	RTextureProgram->RegisterUniforms(planeSceneUniformNames);
 }
 
 //-------------------------------------------------------------------------------

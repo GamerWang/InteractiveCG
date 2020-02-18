@@ -151,6 +151,8 @@ xcopy $(SolutionDir)$(ProjectName)\Data $(targetDir)Data\ /Y</Command>
   </ItemGroup>
   <ItemGroup>
     <None Include="Data\FragmentShader.glsl" />
+    <None Include="Data\SF_Plane.glsl" />
+    <None Include="Data\SV_Plane.glsl" />
     <None Include="Data\VertexShader.glsl" />
   </ItemGroup>
   <ItemGroup>

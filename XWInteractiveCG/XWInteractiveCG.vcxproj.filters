@@ -53,6 +53,12 @@
     <None Include="Data\FragmentShader.glsl">
       <Filter>Source Files\Data\Shaders</Filter>
     </None>
+    <None Include="Data\SF_Plane.glsl">
+      <Filter>Source Files\Data\Shaders</Filter>
+    </None>
+    <None Include="Data\SV_Plane.glsl">
+      <Filter>Source Files\Data\Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Programs\cyCore.h">
