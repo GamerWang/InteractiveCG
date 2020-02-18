@@ -251,8 +251,9 @@ void ShowViewport(int argc, char* argv[]) {
 	// initialize render texture buffer
 	baseSceneBuffer = new GLRenderTexture2D();
 	baseSceneBuffer->Initialize(true, 3, 1024, 1024);
-	baseSceneBuffer->SetTextureFilteringMode(GL_LINEAR, GL_LINEAR);
 	baseSceneBuffer->BuildTextureMipmaps();
+	baseSceneBuffer->SetTextureFilteringMode(GL_LINEAR, GL_LINEAR);
+	baseSceneBuffer->SetTextureMaxAnisotropy();
 
 	// install shaders to opengl
 	InstallTeapotSceneShaders();
