@@ -20,6 +20,11 @@
 
 //-------------------------------------------------------------------------------
 
+#define xw_default_diff_tex "brick.png"
+#define xw_default_spec_tex "brick-specular.png"
+
+//-------------------------------------------------------------------------------
+
 class Material {
 public:
 	struct Texture {
@@ -44,6 +49,7 @@ protected:
 	Texture diffuseTexture;
 	Texture specularTexture;
 public:
+	void Initialize();
 	void Initialize(cyTriMesh::Mtl* mtl);
 	Texture GetDiffuseTextureData() { return diffuseTexture; }
 	Texture GetSpecularTextureData() { return specularTexture; }
@@ -52,9 +58,23 @@ public:
 //-------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------
 
+inline void Material::Initialize() {
+	diffuseTexture = Texture(xw_default_diff_tex);
+	specularTexture = Texture(xw_default_spec_tex);
+}
+
+//-------------------------------------------------------------------------------
+
 inline void Material::Initialize(cyTriMesh::Mtl* mtl) {
-	diffuseTexture = Texture(mtl->map_Kd.data);
-	specularTexture = Texture(mtl->map_Ks.data);
+	if(mtl->map_Kd.data != nullptr)
+		diffuseTexture = Texture(mtl->map_Kd.data);
+	else
+		diffuseTexture = Texture(xw_default_diff_tex);
+
+	if(mtl->map_Ks.data != nullptr)
+		specularTexture = Texture(mtl->map_Ks.data);
+	else
+		specularTexture = Texture(xw_default_spec_tex);
 }
 
 //-------------------------------------------------------------------------------

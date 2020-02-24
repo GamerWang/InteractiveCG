@@ -88,8 +88,10 @@
     </Link>
     <PostBuildEvent>
       <Command>xcopy $(SolutionDir)Middleware\freeglut\bin\freeglut.dll $(targetDir) /Y
+
 xcopy $(SolutionDir)Middleware\glew-2.1.0\bin\glew32.dll $(targetDir) /Y
-xcopy $(SolutionDir)$(ProjectName)\Data $(targetDir)Data\ /Y</Command>
+
+xcopy /E $(SolutionDir)$(ProjectName)\Data $(targetDir)Data\ /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -125,8 +127,10 @@ xcopy $(SolutionDir)$(ProjectName)\Data $(targetDir)Data\ /Y</Command>
     </Link>
     <PostBuildEvent>
       <Command>xcopy $(SolutionDir)Middleware\freeglut\bin\freeglut.dll $(targetDir) /Y
+
 xcopy $(SolutionDir)Middleware\glew-2.1.0\bin\glew32.dll $(targetDir) /Y
-xcopy $(SolutionDir)$(ProjectName)\Data $(targetDir)Data\ /Y</Command>
+
+xcopy /E $(SolutionDir)$(ProjectName)\Data $(targetDir)Data\ /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -151,7 +155,9 @@ xcopy $(SolutionDir)$(ProjectName)\Data $(targetDir)Data\ /Y</Command>
   </ItemGroup>
   <ItemGroup>
     <None Include="Data\FragmentShader.glsl" />
+    <None Include="Data\SF_Cubemap.glsl" />
     <None Include="Data\SF_Plane.glsl" />
+    <None Include="Data\SV_Cubemap.glsl" />
     <None Include="Data\SV_Plane.glsl" />
     <None Include="Data\VertexShader.glsl" />
   </ItemGroup>

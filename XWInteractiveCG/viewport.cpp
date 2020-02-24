@@ -62,11 +62,14 @@ char RTextureVertShaderPath[30] = "Data\\SV_Plane.glsl";
 char RTextureFragShaderPath[30] = "Data\\SF_Plane.glsl";
 GLSLProgram* RTextureProgram;
 
+char cubemapVertShaderPath[30] = "Data\\SV_Cubemap.glsl";
+char cubemapFragShaderPath[30] = "Data\\SF_Cubemap.glsl";
+GLSLProgram* cubemapProgram;
+
 //-------------------------------------------------------------------------------
 
 char uniformNames[500] = {
-	"worldToClampMatrix"
-	" objectToWorldMatrix"
+	"objectToWorldMatrix"
 	" objectNormalToWorldMatrix"
 	" glossiness"
 	" diffuseColor"
@@ -81,6 +84,10 @@ char planeSceneUniformNames[500] = {
 	"objectToClampMatrix"
 };
 
+char cubemapUniformsNames[500] = {
+	"objectToWorldMatrix"
+};
+
 //-------------------------------------------------------------------------------
 
 GLuint baseVertexArrayObjectID;
@@ -88,9 +95,15 @@ GLuint baseVertexBufferID;
 GLuint baseIndexBufferID;
 GLuint baseNumIndices;
 
+GLuint envCubeVertexArrayObjectID;
+GLuint envVertexBufferID;
+GLuint envIndexBufferID;
+
 GLuint RTextureVertexArrayObjectID;
 GLuint RTexturePlaneVertexBufferID;
 GLuint RTexturePlaneIndexBufferID;
+
+GLuint uniformBufferobjectMatrices;
 
 //-------------------------------------------------------------------------------
 
@@ -117,6 +130,8 @@ Vec3f baseObjectPosition;
 Vec3f baseObjectRotation;
 Vec3f baseObjectScale;
 Vec3f baseObjectCenter;
+
+cyTriMesh* envCubeObject = nullptr;
 
 //-------------------------------------------------------------------------------
 
@@ -163,6 +178,7 @@ void SendDataToOpenGL(char objName[]);
 void InstallTeapotSceneShaders();
 void CompileTeapotSceneShaders();
 void InstallPlaneSceneShaders();
+void InstallEnvCubemapShaders();
 
 //-------------------------------------------------------------------------------
 
@@ -256,8 +272,29 @@ void ShowViewport(int argc, char* argv[]) {
 	baseSceneBuffer->SetTextureMaxAnisotropy();
 
 	// install shaders to opengl
+	InstallEnvCubemapShaders();
 	InstallTeapotSceneShaders();
 	InstallPlaneSceneShaders();
+
+	// generate and bind uniform buffer objects
+	{
+		// get relevant block indices
+		GLuint uniformBlockIndexBase = glGetUniformBlockIndex(baseProgram->GetID(), "Matrices");
+		GLuint uniformBlockIndexCubemap = glGetUniformBlockIndex(cubemapProgram->GetID(), "Matrices");
+
+		// link each shader's uniform block to this uniform binding point
+		glUniformBlockBinding(baseProgram->GetID(), uniformBlockIndexBase, 0);
+		glUniformBlockBinding(cubemapProgram->GetID(), uniformBlockIndexCubemap, 0);
+
+		// now create the buffer
+		glGenBuffers(1, &uniformBufferobjectMatrices);
+		glBindBuffer(GL_UNIFORM_BUFFER, uniformBufferobjectMatrices);
+		glBufferData(GL_UNIFORM_BUFFER, sizeof(Matrix4f), NULL, GL_STATIC_DRAW);
+		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+		// define the range of the buffer that links to a uniform binding point
+		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uniformBufferobjectMatrices, 0, sizeof(Matrix4f));
+	}
 
 	glutMainLoop();
 } 
@@ -266,88 +303,141 @@ void ShowViewport(int argc, char* argv[]) {
 
 void GlutDisplay() {
 	// rendering the teapot scene to target buffer
-	baseSceneBuffer->Bind();
-
-	// compute matrices here
+	//baseSceneBuffer->Bind();
+	
 	glClearColor(.5f, .1f, .1f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	// send uniforms here
-	Matrix4f objectToWorldMatrix =
-		Matrix4f::Translation(baseObjectPosition) *
-		Matrix4f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) *
-		Matrix4f::Scale(baseObjectScale) *
-		Matrix4f::RotationXYZ(-Pi<float>() / 2, 0, 0) *
-		Matrix4f::Translation(-baseObjectCenter);
-
-	Matrix3f objectNormalToWorldMatrix = 
-		Matrix3f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) *
-		Matrix3f::Scale(baseObjectScale).GetInverse() *
-		Matrix3f::RotationXYZ(-Pi<float>() / 2, 0, 0);
-
-	Matrix4f WorldToViewMatrix =
-		baseCamera->WorldToViewMatrix();
-
-	Matrix4f worldToClampMatrix = WorldToViewMatrix;
-	if (baseCamera->GetCameraType() == CameraType::XW_CAMERA_PERSPECTIVE) {
-		Matrix4f viewToProjectionMatrix = baseCamera->ViewToProjectionMatrix();
-		worldToClampMatrix = viewToProjectionMatrix * worldToClampMatrix;
-	}
-	else if (baseCamera->GetCameraType() == CameraType::XW_CAMERA_ORTHOGONAL) {
-		worldToClampMatrix.OrthogonalizeZ();
-	}
-
-	glBindVertexArray(baseVertexArrayObjectID);
-	baseProgram->Bind();
-
-	baseProgram->SetUniformMatrix4("worldToClampMatrix", &worldToClampMatrix.cell[0]);
-	baseProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
-	baseProgram->SetUniformMatrix3("objectNormalToWorldMatrix", &objectNormalToWorldMatrix.cell[0]);
-
-	baseProgram->SetUniform1("glossiness", 1, &baseObjectGlossiness);
-	baseProgram->SetUniform3("diffuseColor", 1, baseObjectDiffuseColor.Elements());
-	baseProgram->SetUniform3("specularColor", 1, baseObjectSpecularColor.Elements());
-
-	baseProgram->SetUniform3("cameraPosition", 1, baseCamera->GetPosition().Elements());
-	baseProgram->SetUniform3("ambientLight", 1, ambientLight.GetIntensity().Elements());
-	baseProgram->SetUniform3("pointLight0pos", 1, pointLight0.GetPosition().Elements());
-	baseProgram->SetUniform3("pointLight0Intensity", 1, pointLight0.GetIntensity().Elements());
-
-	baseObjectDiffuse->Bind(0);
-	baseObjectSpecular->Bind(1);
-
-	switch (renderMode)
+	
+	// send worldToClamp to uniform buffer object
 	{
-	case XW_RENDER_LINELOOP:
-		glDrawElements(GL_LINE_LOOP, baseNumIndices, GL_UNSIGNED_INT, 0);
-		break;
-	case XW_RENDER_TRIANGLES:
-	default:
-		glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
-		break;
-	}
-	baseSceneBuffer->Unbind();
+		Matrix4f WorldToViewMatrix =
+			baseCamera->WorldToViewMatrix();
 
-	Matrix4f PlaneSceneWorldToViewMatrix =
-		planeSceneCamera->WorldToViewMatrix();
-	if (planeSceneCamera->GetCameraType() == CameraType::XW_CAMERA_PERSPECTIVE) {
-		Matrix4f viewToProjectionMatrix = planeSceneCamera->ViewToProjectionMatrix();
-		PlaneSceneWorldToViewMatrix = viewToProjectionMatrix * PlaneSceneWorldToViewMatrix;
-	}
-	else if (planeSceneCamera->GetCameraType() == CameraType::XW_CAMERA_ORTHOGONAL) {
-		PlaneSceneWorldToViewMatrix.OrthogonalizeZ();
+		Matrix4f worldToClampMatrix = WorldToViewMatrix;
+		if (baseCamera->GetCameraType() == CameraType::XW_CAMERA_PERSPECTIVE) {
+			Matrix4f viewToProjectionMatrix = baseCamera->ViewToProjectionMatrix();
+			worldToClampMatrix = viewToProjectionMatrix * worldToClampMatrix;
+		}
+		else if (baseCamera->GetCameraType() == CameraType::XW_CAMERA_ORTHOGONAL) {
+			worldToClampMatrix.OrthogonalizeZ();
+		}
+
+		glBindBuffer(GL_UNIFORM_BUFFER, uniformBufferobjectMatrices);
+		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Matrix4f), &worldToClampMatrix.cell[0]);
+		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 	}
 
-	glClearColor(.5f, .5f, .5f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	// render environment cube
+	{
+		glDepthMask(GL_FALSE);
 
-	RTextureProgram->Bind();
-	glBindVertexArray(RTextureVertexArrayObjectID);
-	baseSceneBuffer->BindTexture(2);
+		Matrix4f objectToWorldMatrix =
+			Matrix4f::Translation(baseCamera->GetPosition());
 
-	RTextureProgram->SetUniformMatrix4("objectToClampMatrix", &PlaneSceneWorldToViewMatrix.cell[0]);
+		Matrix4f WorldToViewMatrix =
+			baseCamera->WorldToViewMatrix();
 
-	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		Matrix4f worldToClampMatrix = WorldToViewMatrix;
+		if (baseCamera->GetCameraType() == CameraType::XW_CAMERA_PERSPECTIVE) {
+			Matrix4f viewToProjectionMatrix = baseCamera->ViewToProjectionMatrix();
+			worldToClampMatrix = viewToProjectionMatrix * worldToClampMatrix;
+		}
+		else if (baseCamera->GetCameraType() == CameraType::XW_CAMERA_ORTHOGONAL) {
+			worldToClampMatrix.OrthogonalizeZ();
+		}
+
+		glBindVertexArray(envCubeVertexArrayObjectID);
+		cubemapProgram->Bind();
+
+		cubemapProgram->SetUniformMatrix4("worldToClampMatrix", &worldToClampMatrix.cell[0]);
+		cubemapProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
+
+		glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+		//glDrawElements(GL_LINE_LOOP, 36, GL_UNSIGNED_INT, 0);
+	}
+
+	// render target object
+	// compute matrices here
+	{
+		glDepthMask(GL_TRUE);
+
+		// send uniforms here
+		Matrix4f objectToWorldMatrix =
+			Matrix4f::Translation(baseObjectPosition) *
+			Matrix4f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) *
+			Matrix4f::Scale(baseObjectScale) *
+			Matrix4f::RotationXYZ(-Pi<float>() / 2, 0, 0) *
+			Matrix4f::Translation(-baseObjectCenter);
+
+		Matrix3f objectNormalToWorldMatrix = 
+			Matrix3f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) *
+			Matrix3f::Scale(baseObjectScale).GetInverse() *
+			Matrix3f::RotationXYZ(-Pi<float>() / 2, 0, 0);
+
+		Matrix4f WorldToViewMatrix =
+			baseCamera->WorldToViewMatrix();
+
+		Matrix4f worldToClampMatrix = WorldToViewMatrix;
+		if (baseCamera->GetCameraType() == CameraType::XW_CAMERA_PERSPECTIVE) {
+			Matrix4f viewToProjectionMatrix = baseCamera->ViewToProjectionMatrix();
+			worldToClampMatrix = viewToProjectionMatrix * worldToClampMatrix;
+		}
+		else if (baseCamera->GetCameraType() == CameraType::XW_CAMERA_ORTHOGONAL) {
+			worldToClampMatrix.OrthogonalizeZ();
+		}
+
+		glBindVertexArray(baseVertexArrayObjectID);
+		baseProgram->Bind();
+
+		baseProgram->SetUniformMatrix4("worldToClampMatrix", &worldToClampMatrix.cell[0]);
+		baseProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
+		baseProgram->SetUniformMatrix3("objectNormalToWorldMatrix", &objectNormalToWorldMatrix.cell[0]);
+
+		baseProgram->SetUniform1("glossiness", 1, &baseObjectGlossiness);
+		baseProgram->SetUniform3("diffuseColor", 1, baseObjectDiffuseColor.Elements());
+		baseProgram->SetUniform3("specularColor", 1, baseObjectSpecularColor.Elements());
+
+		baseProgram->SetUniform3("cameraPosition", 1, baseCamera->GetPosition().Elements());
+		baseProgram->SetUniform3("ambientLight", 1, ambientLight.GetIntensity().Elements());
+		baseProgram->SetUniform3("pointLight0pos", 1, pointLight0.GetPosition().Elements());
+		baseProgram->SetUniform3("pointLight0Intensity", 1, pointLight0.GetIntensity().Elements());
+
+		baseObjectDiffuse->Bind(0);
+		baseObjectSpecular->Bind(1);
+
+		switch (renderMode)
+		{
+		case XW_RENDER_LINELOOP:
+			glDrawElements(GL_LINE_LOOP, baseNumIndices, GL_UNSIGNED_INT, 0);
+			break;
+		case XW_RENDER_TRIANGLES:
+		default:
+			glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
+			break;
+		}
+	}
+	//baseSceneBuffer->Unbind();
+
+	//Matrix4f PlaneSceneWorldToViewMatrix =
+	//	planeSceneCamera->WorldToViewMatrix();
+	//if (planeSceneCamera->GetCameraType() == CameraType::XW_CAMERA_PERSPECTIVE) {
+	//	Matrix4f viewToProjectionMatrix = planeSceneCamera->ViewToProjectionMatrix();
+	//	PlaneSceneWorldToViewMatrix = viewToProjectionMatrix * PlaneSceneWorldToViewMatrix;
+	//}
+	//else if (planeSceneCamera->GetCameraType() == CameraType::XW_CAMERA_ORTHOGONAL) {
+	//	PlaneSceneWorldToViewMatrix.OrthogonalizeZ();
+	//}
+
+	//glClearColor(.5f, .5f, .5f, 1.0f);
+	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	//RTextureProgram->Bind();
+	//glBindVertexArray(RTextureVertexArrayObjectID);
+	//baseSceneBuffer->BindTexture(2);
+
+	//RTextureProgram->SetUniformMatrix4("objectToClampMatrix", &PlaneSceneWorldToViewMatrix.cell[0]);
+
+	//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
 	glutSwapBuffers();
 }
@@ -397,6 +487,15 @@ void GlutKeyboard(unsigned char key, int x, int y) {
 
 void GlutSpecialKey(int key, int x, int y) {
 	switch (key) {
+	case GLUT_KEY_F1:
+		renderMode = XW_RENDER_TRIANGLES;
+		break;
+	case GLUT_KEY_F2:
+		renderMode = XW_RENDER_LINELOOP;
+		break;
+	case GLUT_KEY_F3:
+		renderMode = XW_RENDER_TRIANGLES;
+		break;
 	case GLUT_KEY_F6:
 		printf("Recompile shaders\n");
 		CompileTeapotSceneShaders();
@@ -457,7 +556,6 @@ void GlutMouseDrag(int x, int y) {
 			}
 			else {
 				Vec2f cameraRotate = mouseMove * CAMERA_ROTATION_SPEED;
-				//baseCamera->RotateCameraByLocal(cameraRotate);
 				baseCamera->RotateCameraByOrigin(cameraRotate);
 			}
 		}
@@ -468,7 +566,6 @@ void GlutMouseDrag(int x, int y) {
 			}
 			else {
 				float cameraMoveDis = mouseMove.Dot(Vec2f(1, -1)) * CAMERA_MOVE_SPEED;
-				//baseCamera->MoveCameraAlongView(cameraMoveDis);
 				baseCamera->ScaleDistanceAlongView(cameraMoveDis);
 			}
 		}
@@ -491,10 +588,10 @@ void GlutReshapeWindow(int width, int height) {
 
 void SendDataToOpenGL(char objName[]) {
 	// Source teapot scene data
-	// read teapot data
 	char objPath[50] = "Data\\";
 	strcat(objPath, objName);
 	
+	// read teapot data
 	targetObject = new cyTriMesh();
 	if (targetObject->LoadFromFileObj(objPath, true)) {
 		// process vertex data
@@ -541,9 +638,14 @@ void SendDataToOpenGL(char objName[]) {
 		}
 
 		// process material data
-		if (targetObject->NM() > 0) {
-			cyTriMesh::Mtl* material = &targetObject->M(0);
-			baseObjectMaterial->Initialize(material);
+		{
+			if (targetObject->NM() > 0) {
+				cyTriMesh::Mtl* material = &targetObject->M(0);
+				baseObjectMaterial->Initialize(material);
+			}
+			else {
+				baseObjectMaterial->Initialize();
+			}
 			// passing data
 			{
 				Material::Texture diffuseTexture = baseObjectMaterial->GetDiffuseTextureData();
@@ -585,26 +687,74 @@ void SendDataToOpenGL(char objName[]) {
 		return;
 	}
 
+	// read cube data
+	char cubePath[50] = "Data\\cube.obj";
+	envCubeObject = new cyTriMesh();
+	if (envCubeObject->LoadFromFileObj(cubePath, true)) {
+		GLuint vertexNumber = envCubeObject->NV();
+		GLuint indicesNumber = envCubeObject->NF() * 3;
+		Vec3f* cubeVertices = new Vec3f[vertexNumber];
+		GLuint* cubeIndices = new GLuint[indicesNumber];
+
+		for (GLuint i = 0; i < vertexNumber; i++) {
+			cubeVertices[i] = Vec3f(envCubeObject->V(i));
+		}
+
+		for (GLuint i = 0; i < envCubeObject->NF(); i++) {
+			TriMesh::TriFace currentFace = envCubeObject->F(i);
+
+			cubeIndices[i * 3] = currentFace.v[0];
+			cubeIndices[i * 3 + 1] = currentFace.v[1];
+			cubeIndices[i * 3 + 2] = currentFace.v[2];
+			//printf("Current index: %d, %d, %d\n", currentFace.v[0], currentFace.v[1], currentFace.v[2]);
+		}
+
+		glGenBuffers(1, &envVertexBufferID);
+		glBindBuffer(GL_ARRAY_BUFFER, envVertexBufferID);
+		glBufferData(GL_ARRAY_BUFFER, vertexNumber * sizeof(Vec3f), cubeVertices, GL_STATIC_DRAW);
+
+		glGenBuffers(1, &envIndexBufferID);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, envIndexBufferID);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesNumber * sizeof(GLuint), cubeIndices, GL_STATIC_DRAW);
+
+		delete[] cubeVertices;
+		delete[] cubeIndices;
+
+		glGenVertexArrays(1, &envCubeVertexArrayObjectID);
+
+		glBindVertexArray(envCubeVertexArrayObjectID);
+		glEnableVertexAttribArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, envVertexBufferID);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vec3f), 0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, envIndexBufferID);
+		glBindVertexArray(0);
+	}
+	else {
+		return;
+	}
+
 	// Plane Scene data
-	Plane plane;
-	glGenBuffers(1, &RTexturePlaneVertexBufferID);
-	glBindBuffer(GL_ARRAY_BUFFER, RTexturePlaneVertexBufferID);
-	glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(Vertex), plane.GetVertices(), GL_STATIC_DRAW);
+	{
+		Plane plane;
+		glGenBuffers(1, &RTexturePlaneVertexBufferID);
+		glBindBuffer(GL_ARRAY_BUFFER, RTexturePlaneVertexBufferID);
+		glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(Vertex), plane.GetVertices(), GL_STATIC_DRAW);
 
-	glGenBuffers(1, &RTexturePlaneIndexBufferID);
-	glBindBuffer(GL_ARRAY_BUFFER, RTexturePlaneIndexBufferID);
-	glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(unsigned int), plane.GetIndices(), GL_STATIC_DRAW);
+		glGenBuffers(1, &RTexturePlaneIndexBufferID);
+		glBindBuffer(GL_ARRAY_BUFFER, RTexturePlaneIndexBufferID);
+		glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(unsigned int), plane.GetIndices(), GL_STATIC_DRAW);
 	
-	glGenVertexArrays(1, &RTextureVertexArrayObjectID);
-	glBindVertexArray(RTextureVertexArrayObjectID);
-	glEnableVertexAttribArray(0);
-	glEnableVertexAttribArray(1);
-	glBindBuffer(GL_ARRAY_BUFFER, RTexturePlaneVertexBufferID);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (char*)(sizeof(float) * 6));
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, RTexturePlaneIndexBufferID);
+		glGenVertexArrays(1, &RTextureVertexArrayObjectID);
+		glBindVertexArray(RTextureVertexArrayObjectID);
+		glEnableVertexAttribArray(0);
+		glEnableVertexAttribArray(1);
+		glBindBuffer(GL_ARRAY_BUFFER, RTexturePlaneVertexBufferID);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (char*)(sizeof(float) * 6));
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, RTexturePlaneIndexBufferID);
 
-	glBindVertexArray(0);
+		glBindVertexArray(0);	
+	}
 }
 //-------------------------------------------------------------------------------
 
@@ -673,6 +823,32 @@ void InstallPlaneSceneShaders() {
 	fragmentShader->Delete();
 
 	RTextureProgram->RegisterUniforms(planeSceneUniformNames);
+}
+
+//-------------------------------------------------------------------------------
+
+void InstallEnvCubemapShaders() {
+	vertexShader = new GLSLShader();
+	fragmentShader = new GLSLShader();
+
+	cubemapProgram = new GLSLProgram();
+
+	if (!vertexShader->CompileFile(cubemapVertShaderPath, GL_VERTEX_SHADER)) {
+		return;
+	}
+	if (!fragmentShader->CompileFile(cubemapFragShaderPath, GL_FRAGMENT_SHADER)) {
+		return;
+	}
+
+	cubemapProgram->CreateProgram();
+	cubemapProgram->AttachShader(vertexShader->GetID());
+	cubemapProgram->AttachShader(fragmentShader->GetID());
+	cubemapProgram->Link();
+
+	vertexShader->Delete();
+	fragmentShader->Delete();
+
+	cubemapProgram->RegisterUniforms(cubemapUniformsNames);
 }
 
 //-------------------------------------------------------------------------------

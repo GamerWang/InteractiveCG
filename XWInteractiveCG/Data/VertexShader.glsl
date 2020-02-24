@@ -8,9 +8,12 @@ out vec2 texcoord;
 out vec3 worldNormal;
 out vec3 worldPosition;
 
+layout (std140) uniform Matrices{
+	mat4 worldToClamp;
+};
+
 uniform mat4 objectToWorldMatrix;
 uniform mat3 objectNormalToWorldMatrix;
-uniform mat4 worldToClampMatrix;
 
 uniform vec3 pointLight0pos;
 
@@ -24,6 +27,6 @@ void main(){
 
 	worldPosition = vec3(v);
 
-	v = worldToClampMatrix * v;
+	v = worldToClamp * v;
 	gl_Position = v;
 }
