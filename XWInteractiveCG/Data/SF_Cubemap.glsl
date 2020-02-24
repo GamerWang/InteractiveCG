@@ -2,6 +2,10 @@
 
 layout (location = 0) out vec4 daColor;
 
+in vec3 TexCoords;
+
+uniform samplerCube skybox;
+
 void main(){
-	daColor = vec4(0.0, 0.0, 1.0, 1.0);
+	daColor = texture(skybox, TexCoords);
 }

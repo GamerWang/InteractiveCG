@@ -5,14 +5,17 @@ layout (location = 1) in vec2 texturecoord;
 
 out vec2 texcoord;
 
-uniform mat4 objectToClampMatrix;
+layout (std140) uniform Matrices{
+	mat4 worldToClamp;
+};
+uniform mat4 objectToWorldMatrix;
 
 void main(){
 	texcoord = vec2(texturecoord);
 
 	vec4 v = vec4(pos, 1.0);
 	
-	v = objectToClampMatrix * v;
+	v = worldToClamp * objectToWorldMatrix * v;
 
 	gl_Position = v;
 }
