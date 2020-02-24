@@ -52,12 +52,12 @@ enum RenderMode {
 
 //-------------------------------------------------------------------------------
 
-char targetVertShaderPath[30] = "Data\\VertexShader.glsl";
-char targetFragShaderPath[30] = "Data\\FragmentShader.glsl";
+char targetVertShaderPath[30] = "Data\\SV_TargetObj.glsl";
+char targetFragShaderPath[30] = "Data\\SF_TargetObj.glsl";
 GLSLShader* vertexShader;
 GLSLShader* fragmentShader;
 GLSLProgram* targetObjectProgram;
-GLRenderTexture2D* baseSceneBuffer;
+GLRenderTexture2D* reflectionFrameBuffer;
 
 char RTextureVertShaderPath[30] = "Data\\SV_RTPlane.glsl";
 char RTextureFragShaderPath[30] = "Data\\SF_RTPlane.glsl";
@@ -292,11 +292,11 @@ void ShowViewport(int argc, char* argv[]) {
 	baseObjectCenter /= 2;
 
 	// initialize render texture buffer
-	baseSceneBuffer = new GLRenderTexture2D();
-	baseSceneBuffer->Initialize(true, 3, 1024, 1024);
-	baseSceneBuffer->BuildTextureMipmaps();
-	baseSceneBuffer->SetTextureFilteringMode(GL_LINEAR, GL_LINEAR);
-	baseSceneBuffer->SetTextureMaxAnisotropy();
+	reflectionFrameBuffer = new GLRenderTexture2D();
+	reflectionFrameBuffer->Initialize(true, 3, 800, 800);
+	reflectionFrameBuffer->BuildTextureMipmaps();
+	reflectionFrameBuffer->SetTextureFilteringMode(GL_LINEAR, GL_LINEAR);
+	reflectionFrameBuffer->SetTextureMaxAnisotropy();
 
 	// install shaders to opengl
 	InstallTeapotSceneShaders();
@@ -334,11 +334,94 @@ void ShowViewport(int argc, char* argv[]) {
 void GlutDisplay() {
 	// rendering the teapot reflection to target buffer
 	{
-		baseSceneBuffer->Bind();
+		reflectionFrameBuffer->Bind();
 
-		glEnable(GL_CLIP_DISTANCE0);
+		glClearColor(0, 0, 0, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		baseSceneBuffer->Unbind();
+		Camera reflectionCam = Camera(baseCamera);
+		// setting the reflection camera
+		{
+			reflectionCam.ReflectOnYPlane(planePosition.y);
+
+			Matrix4f worldToViewMatrix =
+				reflectionCam.WorldToViewMatrix();
+
+			Matrix4f worldToClampMatrix = worldToViewMatrix;
+			if (reflectionCam.GetCameraType() == CameraType::XW_CAMERA_PERSPECTIVE) {
+				Matrix4f viewToProjectionMatrix = reflectionCam.ViewToProjectionMatrix();
+				worldToClampMatrix = viewToProjectionMatrix * worldToClampMatrix;
+			}
+			else if (reflectionCam.GetCameraType() == CameraType::XW_CAMERA_ORTHOGONAL) {
+				worldToClampMatrix.OrthogonalizeZ();
+			}
+			worldToClampMatrix = Matrix4f::Scale(-1, -1, 1, 1) * worldToClampMatrix;
+
+			glBindBuffer(GL_UNIFORM_BUFFER, uniformBufferObjectMatrices);
+			glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Matrix4f), &worldToClampMatrix.cell[0]);
+			glBindBuffer(GL_UNIFORM_BUFFER, 0);
+		}
+
+		// render environment cube
+		{
+			glDepthMask(GL_FALSE);
+
+			Matrix4f objectToWorldMatrix =
+				Matrix4f::Translation(reflectionCam.GetPosition());
+
+			glBindVertexArray(envCubeVertexArrayObjectID);
+			cubemapProgram->Bind();
+
+			cubemapProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
+
+			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+		}
+
+		// render target object
+		{
+			glDepthMask(GL_TRUE);
+			glEnable(GL_CLIP_DISTANCE0);
+
+			// send uniforms here
+			Matrix4f objectToWorldMatrix =
+				Matrix4f::Translation(baseObjectPosition) *
+				Matrix4f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) *
+				Matrix4f::Scale(baseObjectScale) *
+				Matrix4f::RotationXYZ(-Pi<float>() / 2, 0, 0) *
+				Matrix4f::Translation(-baseObjectCenter);
+
+			Matrix3f objectNormalToWorldMatrix =
+				Matrix3f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) *
+				Matrix3f::Scale(baseObjectScale).GetInverse() *
+				Matrix3f::RotationXYZ(-Pi<float>() / 2, 0, 0);
+
+
+			Vec4f clipPlane = Vec4f(0, 1, 0, 8);
+			if (baseCamera->GetViewDir().Dot(Vec3f(0, 1, 0)) > 0) {
+				clipPlane *= -1;
+			}
+
+			glBindVertexArray(baseVertexArrayObjectID);
+			targetObjectProgram->Bind();
+
+			targetObjectProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
+			targetObjectProgram->SetUniformMatrix3("objectNormalToWorldMatrix", &objectNormalToWorldMatrix.cell[0]);
+
+			targetObjectProgram->SetUniform1("glossiness", 1, &baseObjectGlossiness);
+			targetObjectProgram->SetUniform3("diffuseColor", 1, baseObjectDiffuseColor.Elements());
+			targetObjectProgram->SetUniform3("specularColor", 1, baseObjectSpecularColor.Elements());
+
+			targetObjectProgram->SetUniform3("cameraPosition", 1, reflectionCam.GetPosition().Elements());
+			targetObjectProgram->SetUniform3("ambientLight", 1, ambientLight.GetIntensity().Elements());
+			targetObjectProgram->SetUniform3("pointLight0pos", 1, pointLight0.GetPosition().Elements());
+			targetObjectProgram->SetUniform3("pointLight0Intensity", 1, pointLight0.GetIntensity().Elements());
+
+			targetObjectProgram->SetUniform4("clipPlane", 1, clipPlane.Elements());
+
+			glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
+		}
+
+		reflectionFrameBuffer->Unbind();
 	}
 
 	glClearColor(0, 0, 0, 1.0f);
@@ -346,10 +429,10 @@ void GlutDisplay() {
 	
 	// send worldToClamp to uniform buffer object
 	{
-		Matrix4f WorldToViewMatrix =
+		Matrix4f worldToViewMatrix =
 			baseCamera->WorldToViewMatrix();
 
-		Matrix4f worldToClampMatrix = WorldToViewMatrix;
+		Matrix4f worldToClampMatrix = worldToViewMatrix;
 		if (baseCamera->GetCameraType() == CameraType::XW_CAMERA_PERSPECTIVE) {
 			Matrix4f viewToProjectionMatrix = baseCamera->ViewToProjectionMatrix();
 			worldToClampMatrix = viewToProjectionMatrix * worldToClampMatrix;
@@ -369,9 +452,6 @@ void GlutDisplay() {
 
 		Matrix4f objectToWorldMatrix =
 			Matrix4f::Translation(baseCamera->GetPosition());
-
-		Matrix4f WorldToViewMatrix =
-			baseCamera->WorldToViewMatrix();
 
 		glBindVertexArray(envCubeVertexArrayObjectID);
 		cubemapProgram->Bind();
@@ -409,22 +489,9 @@ void GlutDisplay() {
 			Matrix3f::Scale(baseObjectScale).GetInverse() *
 			Matrix3f::RotationXYZ(-Pi<float>() / 2, 0, 0);
 
-		Matrix4f WorldToViewMatrix =
-			baseCamera->WorldToViewMatrix();
-
-		Matrix4f worldToClampMatrix = WorldToViewMatrix;
-		if (baseCamera->GetCameraType() == CameraType::XW_CAMERA_PERSPECTIVE) {
-			Matrix4f viewToProjectionMatrix = baseCamera->ViewToProjectionMatrix();
-			worldToClampMatrix = viewToProjectionMatrix * worldToClampMatrix;
-		}
-		else if (baseCamera->GetCameraType() == CameraType::XW_CAMERA_ORTHOGONAL) {
-			worldToClampMatrix.OrthogonalizeZ();
-		}
-
 		glBindVertexArray(baseVertexArrayObjectID);
 		targetObjectProgram->Bind();
 
-		targetObjectProgram->SetUniformMatrix4("worldToClampMatrix", &worldToClampMatrix.cell[0]);
 		targetObjectProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
 		targetObjectProgram->SetUniformMatrix3("objectNormalToWorldMatrix", &objectNormalToWorldMatrix.cell[0]);
 
@@ -458,6 +525,7 @@ void GlutDisplay() {
 
 		glBindVertexArray(TextureVertexArrayObjectID);
 		planeProgram->Bind();
+		reflectionFrameBuffer->BindTexture(3);
 
 		planeProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
 
@@ -943,6 +1011,7 @@ void CompileTeapotSceneShaders() {
 		planeProgram->AttachShader(fragmentShader->GetID());
 		planeProgram->Link();
 		planeProgram->SetUniform("skybox", 2);
+		planeProgram->SetUniform("renderTexture", 3);
 	}
 
 	vertexShader->Delete();

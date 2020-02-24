@@ -44,6 +44,32 @@ public:
 		type(XW_CAMERA_PERSPECTIVE), 
 		originPosition(0), 
 		cameraOriginRotation(0) {}
+
+	Camera(const Camera &c) {
+		position = c.position;
+		viewDirection = c.viewDirection;
+		UP = c.UP;
+		fov = c.fov;
+		aspect = c.aspect;
+		znear = c.znear;
+		zfar = c.zfar;
+		type = c.type;
+		originPosition = c.originPosition;
+		cameraOriginRotation = c.cameraOriginRotation;
+	}
+
+	Camera(const Camera* c) {
+		position = c->position;
+		viewDirection = c->viewDirection;
+		UP = c->UP;
+		fov = c->fov;
+		aspect = c->aspect;
+		znear = c->znear;
+		zfar = c->zfar;
+		type = c->type;
+		originPosition = c->originPosition;
+		cameraOriginRotation = c->cameraOriginRotation;
+	}
 	
 	void Reset();
 
@@ -56,10 +82,15 @@ public:
 	Vec3f GetPosition() { return position; }
 	void SetPosition(Vec3f p) { position = p; }
 
+	Vec3f GetViewDir() { return viewDirection; }
+	void SetViewDir(Vec3f v) { viewDirection = v; }
+
 	void RotateCameraByLocal(Vec2f rotation);
 	void RotateCameraByOrigin(Vec2f rotation);
 	void MoveCameraAlongView(float moveDistance);
 	void ScaleDistanceAlongView(float moveDistance);
+
+	void ReflectOnYPlane(float planeY);
 
 	Matrix4f WorldToViewMatrix();
 	Matrix4f ViewToProjectionMatrix();
@@ -148,6 +179,14 @@ inline void Camera::ScaleDistanceAlongView(float moveDistance) {
 	}
 	viewDirection = viewDirection - viewDirection.GetNormalized() * moveDistance;
 	position = aimingPoint - viewDirection;
+}
+
+//-------------------------------------------------------------------------------
+
+inline void Camera::ReflectOnYPlane(float planeY) {
+	position -= Vec3f(0, 2 * (position.y - planeY), 0);
+	viewDirection *= Vec3f(1, -1, 1);
+	UP *= Vec3f(1, -1, 1);
 }
 
 //-------------------------------------------------------------------------------
