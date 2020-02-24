@@ -91,6 +91,8 @@ char targetUniformNames[500] = {
 
 char planeUniformNames[500] = {
 	"objectToWorldMatrix"
+	" cameraPosition"
+	" worldNormal"
 };
 
 
@@ -210,7 +212,7 @@ bool IsMouseDown() { return !(mouseStates[0] * mouseStates[1] * mouseStates[2]);
 
 void ShowViewport(int argc, char* argv[]) {
 	// initialize scene data
-	baseObjectPosition = Vec3f(0, 0, 0);
+	baseObjectPosition = Vec3f(0, -4, 0);
 	baseObjectRotation = Vec3f(0, 0, 0);
 	baseObjectScale = Vec3f(1.0f, 1.0f, 1.0f);
 
@@ -363,19 +365,19 @@ void GlutDisplay() {
 		}
 
 		// render environment cube
-		{
-			glDepthMask(GL_FALSE);
+		//{
+		//	glDepthMask(GL_FALSE);
 
-			Matrix4f objectToWorldMatrix =
-				Matrix4f::Translation(reflectionCam.GetPosition());
+		//	Matrix4f objectToWorldMatrix =
+		//		Matrix4f::Translation(reflectionCam.GetPosition());
 
-			glBindVertexArray(envCubeVertexArrayObjectID);
-			cubemapProgram->Bind();
+		//	glBindVertexArray(envCubeVertexArrayObjectID);
+		//	cubemapProgram->Bind();
 
-			cubemapProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
+		//	cubemapProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
 
-			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-		}
+		//	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+		//}
 
 		// render target object
 		{
@@ -395,9 +397,9 @@ void GlutDisplay() {
 				Matrix3f::Scale(baseObjectScale).GetInverse() *
 				Matrix3f::RotationXYZ(-Pi<float>() / 2, 0, 0);
 
-
-			Vec4f clipPlane = Vec4f(0, 1, 0, 8);
-			if (baseCamera->GetViewDir().Dot(Vec3f(0, 1, 0)) > 0) {
+			Vec4f clipPlane = Vec4f(0, 1, 0, -planePosition.y);
+			Vec4f cameraPos = Vec4f(baseCamera->GetPosition());
+			if (cameraPos.Dot(clipPlane) < 0) {
 				clipPlane *= -1;
 			}
 
@@ -523,11 +525,20 @@ void GlutDisplay() {
 			Matrix4f::Scale(planeScale) *
 			Matrix4f::RotationXYZ(planeRotation.x, planeRotation.y, planeRotation.z);
 
+		Vec3f worldNormal = Vec3f(0, 1, 0);
+		Vec4f clipPlane = Vec4f(0, 1, 0, -planePosition.y);
+		Vec4f cameraPos = Vec4f(baseCamera->GetPosition());
+		if (cameraPos.Dot(clipPlane) < 0) {
+			worldNormal *= -1;
+		}
+
 		glBindVertexArray(TextureVertexArrayObjectID);
 		planeProgram->Bind();
 		reflectionFrameBuffer->BindTexture(3);
 
 		planeProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
+		planeProgram->SetUniform3("cameraPosition", 1, baseCamera->GetPosition().Elements());
+		planeProgram->SetUniform3("worldNormal", 1, worldNormal.Elements());
 
 		switch (renderMode)
 		{
@@ -540,29 +551,6 @@ void GlutDisplay() {
 			break;
 		}
 	}
-
-	//baseSceneBuffer->Unbind();
-
-	//Matrix4f PlaneSceneWorldToViewMatrix =
-	//	planeSceneCamera->WorldToViewMatrix();
-	//if (planeSceneCamera->GetCameraType() == CameraType::XW_CAMERA_PERSPECTIVE) {
-	//	Matrix4f viewToProjectionMatrix = planeSceneCamera->ViewToProjectionMatrix();
-	//	PlaneSceneWorldToViewMatrix = viewToProjectionMatrix * PlaneSceneWorldToViewMatrix;
-	//}
-	//else if (planeSceneCamera->GetCameraType() == CameraType::XW_CAMERA_ORTHOGONAL) {
-	//	PlaneSceneWorldToViewMatrix.OrthogonalizeZ();
-	//}
-
-	//glClearColor(.5f, .5f, .5f, 1.0f);
-	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	//RTextureProgram->Bind();
-	//glBindVertexArray(TextureVertexArrayObjectID);
-	//baseSceneBuffer->BindTexture(3);
-
-	//RTextureProgram->SetUniformMatrix4("objectToClampMatrix", &PlaneSceneWorldToViewMatrix.cell[0]);
-
-	//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
 	glutSwapBuffers();
 }

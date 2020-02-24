@@ -36,7 +36,6 @@ void main(){
 	viewTerm = ceil(viewTerm);
 	viewTerm = clamp(viewTerm, 0, 1);
 
-
 	// handling pointLight0
 	// diffuse part
 	vec3 diffuse = vec3(0);
