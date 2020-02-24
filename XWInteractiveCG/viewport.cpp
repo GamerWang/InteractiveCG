@@ -80,6 +80,7 @@ char targetUniformNames[500] = {
 	" diffuseColor"
 	" specularColor"
 	" cameraPosition"
+	" clipPlane"
 	" pointLight0pos"
 	" pointLight0Intensity"
 	" brdfMode"
@@ -331,9 +332,15 @@ void ShowViewport(int argc, char* argv[]) {
 //-------------------------------------------------------------------------------
 
 void GlutDisplay() {
-	// rendering the teapot scene to target buffer
-	//baseSceneBuffer->Bind();
-	
+	// rendering the teapot reflection to target buffer
+	{
+		baseSceneBuffer->Bind();
+
+		glEnable(GL_CLIP_DISTANCE0);
+
+		baseSceneBuffer->Unbind();
+	}
+
 	glClearColor(0, 0, 0, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
@@ -387,6 +394,7 @@ void GlutDisplay() {
 	// compute matrices here
 	{
 		glDepthMask(GL_TRUE);
+		glDisable(GL_CLIP_DISTANCE0);
 
 		// send uniforms here
 		Matrix4f objectToWorldMatrix =
