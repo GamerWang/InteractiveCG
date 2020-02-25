@@ -28,7 +28,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
@@ -76,15 +76,22 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)freeglut\include;$(SolutionDir)$(SolutionName)\Programs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)Middleware\freeglut\include;$(SolutionDir)Middleware\glew-2.1.0\include;$(SolutionDir)$(SolutionName)\Programs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <CompileAs>Default</CompileAs>
+      <DisableSpecificWarnings>4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <AdditionalLibraryDirectories>$(SolutionDir)$(Configuration)\lib;$(SolutionDir);$(SolutionDir)freeglut\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>freeglut.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)$(Configuration)\lib;$(SolutionDir);$(SolutionDir)Middleware\freeglut\lib;$(SolutionDir)Middleware\glew-2.1.0\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>freeglut.lib;glew32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy $(SolutionDir)freeglut\bin\freeglut.dll $(targetDir) /Y</Command>
+      <Command>xcopy $(SolutionDir)Middleware\freeglut\bin\freeglut.dll $(targetDir) /Y
+
+xcopy $(SolutionDir)Middleware\glew-2.1.0\bin\glew32.dll $(targetDir) /Y
+
+xcopy /E $(SolutionDir)$(ProjectName)\Data $(targetDir)Data\ /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -106,17 +113,24 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)freeglut\include;$(SolutionDir)$(SolutionName)\Programs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)Middleware\freeglut\include;$(SolutionDir)Middleware\glew-2.1.0\include;$(SolutionDir)$(SolutionName)\Programs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <CompileAs>Default</CompileAs>
+      <DisableSpecificWarnings>4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>$(SolutionDir)$(Configuration)\lib;$(SolutionDir);$(SolutionDir)freeglut\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>freeglut.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)$(Configuration)\lib;$(SolutionDir);$(SolutionDir)Middleware\freeglut\lib;$(SolutionDir)Middleware\glew-2.1.0\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>freeglut.lib;glew32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy $(SolutionDir)freeglut\bin\freeglut.dll $(targetDir) /Y</Command>
+      <Command>xcopy $(SolutionDir)Middleware\freeglut\bin\freeglut.dll $(targetDir) /Y
+
+xcopy $(SolutionDir)Middleware\glew-2.1.0\bin\glew32.dll $(targetDir) /Y
+
+xcopy /E $(SolutionDir)$(ProjectName)\Data $(targetDir)Data\ /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -136,12 +150,29 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Programs\lodepng.cpp" />
     <ClCompile Include="viewport.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Data\SF_TargetObj.glsl" />
+    <None Include="Data\SF_Cubemap.glsl" />
+    <None Include="Data\SF_Plane.glsl" />
+    <None Include="Data\SV_Cubemap.glsl" />
+    <None Include="Data\SV_Plane.glsl" />
+    <None Include="Data\SV_TargetObj.glsl" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="Programs\cyCore.h" />
+    <ClInclude Include="Programs\cyGL.h" />
+    <ClInclude Include="Programs\cyMatrix.h" />
     <ClInclude Include="Programs\cyPoint.h" />
+    <ClInclude Include="Programs\cyTriMesh.h" />
     <ClInclude Include="Programs\cyVector.h" />
+    <ClInclude Include="Programs\lodepng.h" />
+    <ClInclude Include="Programs\xwHelper.h" />
+    <ClInclude Include="Programs\xwLights.h" />
+    <ClInclude Include="Programs\xwCamera.h" />
+    <ClInclude Include="Programs\xwMaterial.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
