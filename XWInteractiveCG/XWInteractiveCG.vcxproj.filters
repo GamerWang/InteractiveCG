@@ -47,12 +47,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Data\SF_Plane.glsl">
-      <Filter>Source Files\Data\Shaders</Filter>
-    </None>
-    <None Include="Data\SV_Plane.glsl">
-      <Filter>Source Files\Data\Shaders</Filter>
-    </None>
     <None Include="Data\SF_Cubemap.glsl">
       <Filter>Source Files\Data\Shaders</Filter>
     </None>
@@ -63,6 +57,18 @@
       <Filter>Source Files\Data\Shaders</Filter>
     </None>
     <None Include="Data\SV_TargetObj.glsl">
+      <Filter>Source Files\Data\Shaders</Filter>
+    </None>
+    <None Include="Data\SF_RefPlane.glsl">
+      <Filter>Source Files\Data\Shaders</Filter>
+    </None>
+    <None Include="Data\SV_RefPlane.glsl">
+      <Filter>Source Files\Data\Shaders</Filter>
+    </None>
+    <None Include="Data\SV_DiffPlane.glsl">
+      <Filter>Source Files\Data\Shaders</Filter>
+    </None>
+    <None Include="Data\SF_DiffPlane.glsl">
       <Filter>Source Files\Data\Shaders</Filter>
     </None>
   </ItemGroup>

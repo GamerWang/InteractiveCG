@@ -12,12 +12,15 @@ uniform sampler2D renderTexture;
 uniform samplerCube skybox;
 
 void main(){
+	vec3 viewDir = normalize(cameraPosition - worldPosition);
+	vec3 reflectDir = reflect(-viewDir, worldNormal);
+
 	// compute normalized device coordinates
 	vec2 ndc = (clipSpacePos.xy / clipSpacePos.w)/2.0 + vec2(.5, -.5);
 	vec2 reflecTexCoords = vec2(ndc.x, -ndc.y);
 
 	vec3 renderTextureColor = texture(renderTexture, reflecTexCoords).rgb;
-	
+
 	float bias = .01;
 	float renderTexWeight = renderTextureColor.x - bias;
 	renderTexWeight = max(renderTexWeight, renderTextureColor.y - bias);
@@ -25,8 +28,6 @@ void main(){
 	renderTexWeight = ceil(renderTexWeight);
 	float selfWeight = 1 - renderTexWeight;
 
-	vec3 viewDir = normalize(cameraPosition - worldPosition);
-	vec3 reflectDir = reflect(-viewDir, worldNormal);
 
 	vec3 envReflectColor = texture(skybox, reflectDir).rgb;
 

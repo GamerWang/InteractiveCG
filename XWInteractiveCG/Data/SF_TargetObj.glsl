@@ -7,14 +7,16 @@ in vec3 worldNormal;
 in vec3 worldPosition;
 
 uniform float glossiness;
-uniform vec3 diffuseColor;
-uniform vec3 specularColor;
+//uniform vec3 diffuseColor;
+//uniform vec3 specularColor;
 
 uniform vec3 cameraPosition;
 
-uniform vec3 ambientLight;
-uniform vec3 pointLight0Intensity;
-uniform vec3 pointLight0pos;
+layout (std140) uniform Lights{
+	vec3 ambientLight;
+	vec3 pointLight0Intensity;
+	vec3 pointLight0pos;
+};
 
 uniform int brdfMode;
 

@@ -52,6 +52,12 @@ enum RenderMode {
 
 //-------------------------------------------------------------------------------
 
+//#define enable_env_cube
+//#define plane_reflective
+#define plane_diffuse
+
+//-------------------------------------------------------------------------------
+
 char targetVertShaderPath[30] = "Data\\SV_TargetObj.glsl";
 char targetFragShaderPath[30] = "Data\\SF_TargetObj.glsl";
 GLSLShader* vertexShader;
@@ -67,8 +73,15 @@ char cubemapVertShaderPath[30] = "Data\\SV_Cubemap.glsl";
 char cubemapFragShaderPath[30] = "Data\\SF_Cubemap.glsl";
 GLSLProgram* cubemapProgram;
 
-char planeVertShaderPath[30] = "Data\\SV_Plane.glsl";
-char planeFragShaderPath[30] = "Data\\SF_Plane.glsl";
+#ifdef plane_reflective
+char planeVertShaderPath[30] = "Data\\SV_RefPlane.glsl";
+char planeFragShaderPath[30] = "Data\\SF_RefPlane.glsl";
+#endif // plane_reflective
+#ifdef plane_diffuse
+char planeVertShaderPath[30] = "Data\\SV_DiffPlane.glsl";
+char planeFragShaderPath[30] = "Data\\SF_DiffPlane.glsl";
+#endif // plane_diffuse
+
 GLSLProgram* planeProgram;
 
 //-------------------------------------------------------------------------------
@@ -77,8 +90,8 @@ char targetUniformNames[500] = {
 	"objectToWorldMatrix"
 	" objectNormalToWorldMatrix"
 	" glossiness"
-	" diffuseColor"
-	" specularColor"
+	//" diffuseColor"
+	//" specularColor"
 	" cameraPosition"
 	" clipPlane"
 	" pointLight0pos"
@@ -93,6 +106,9 @@ char planeUniformNames[500] = {
 	"objectToWorldMatrix"
 	" cameraPosition"
 	" worldNormal"
+#ifdef plane_diffuse
+	" diffuseTexture"
+#endif // plane_diffuse
 };
 
 
@@ -119,7 +135,8 @@ GLuint TextureVertexArrayObjectID;
 GLuint TexturePlaneVertexBufferID;
 GLuint TexturePlaneIndexBufferID;
 
-GLuint uniformBufferObjectMatrices;
+GLuint UBOMatrices;
+GLuint UBOLights;
 
 //-------------------------------------------------------------------------------
 
@@ -202,7 +219,6 @@ void GlutReshapeWindow(int width, int height);
 void SendDataToOpenGL(char objName[]);
 void InstallTeapotSceneShaders();
 void CompileTeapotSceneShaders();
-void InstallRTPlaneSceneShaders();
 
 //-------------------------------------------------------------------------------
 
@@ -223,7 +239,10 @@ void ShowViewport(int argc, char* argv[]) {
 
 	baseObjectColor = Vec3f(0, 0, 0);
 
-	planePosition = Vec3f(0, -8, 0);
+	// center cut position
+	//planePosition = Vec3f(0, -8, 0);
+	// below teapot position
+	planePosition = Vec3f(0, -12, 0);
 	planeScale = Vec3f(40);
 	planeRotation = Vec3f(-Pi<float>() / 2, 0, 0);
 
@@ -306,25 +325,41 @@ void ShowViewport(int argc, char* argv[]) {
 
 	// generate and bind uniform buffer objects
 	{
+		// Matrices buffer object
 		{
 			// get relevant block indices
-			GLuint uniformBlockIndexBaseVert = glGetUniformBlockIndex(targetObjectProgram->GetID(), "Matrices");
-			GLuint uniformBlockIndexCubemapVert = glGetUniformBlockIndex(cubemapProgram->GetID(), "Matrices");
-			GLuint uniformBlockIndexPlaneVert = glGetUniformBlockIndex(planeProgram->GetID(), "Matrices");
-
 			// link each shader's uniform block to this uniform binding point
+			GLuint uniformBlockIndexBaseVert = glGetUniformBlockIndex(targetObjectProgram->GetID(), "Matrices");
 			glUniformBlockBinding(targetObjectProgram->GetID(), uniformBlockIndexBaseVert, 0);
+
+#ifdef enable_env_cube
+			GLuint uniformBlockIndexCubemapVert = glGetUniformBlockIndex(cubemapProgram->GetID(), "Matrices");
 			glUniformBlockBinding(cubemapProgram->GetID(), uniformBlockIndexCubemapVert, 0);
+#endif // enable_env_cube
+			
+			GLuint uniformBlockIndexPlaneVert = glGetUniformBlockIndex(planeProgram->GetID(), "Matrices");
 			glUniformBlockBinding(planeProgram->GetID(), uniformBlockIndexPlaneVert, 0);
 
 			// now create the buffer
-			glGenBuffers(1, &uniformBufferObjectMatrices);
-			glBindBuffer(GL_UNIFORM_BUFFER, uniformBufferObjectMatrices);
+			glGenBuffers(1, &UBOMatrices);
+			glBindBuffer(GL_UNIFORM_BUFFER, UBOMatrices);
 			glBufferData(GL_UNIFORM_BUFFER, sizeof(Matrix4f), NULL, GL_STATIC_DRAW);
 			glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
 			// define the range of the buffer that links to a uniform binding point
-			glBindBufferRange(GL_UNIFORM_BUFFER, 0, uniformBufferObjectMatrices, 0, sizeof(Matrix4f));
+			glBindBufferRange(GL_UNIFORM_BUFFER, 0, UBOMatrices, 0, sizeof(Matrix4f));
+		}
+		// lights buffer object
+		{
+			GLuint uniformBlockIndexBaseFrag = glGetUniformBlockIndex(targetObjectProgram->GetID(), "Lights");
+			glUniformBlockBinding(targetObjectProgram->GetID(), uniformBlockIndexBaseFrag, 1);
+
+			glGenBuffers(1, &UBOLights);
+			glBindBuffer(GL_UNIFORM_BUFFER, UBOLights);
+			glBufferData(GL_UNIFORM_BUFFER, sizeof(Vec3f) * 3, NULL, GL_STATIC_DRAW);
+			glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+			glBindBufferRange(GL_UNIFORM_BUFFER, 1, UBOLights, 0, sizeof(Vec3f) * 3);
 		}
 	}
 
@@ -359,12 +394,13 @@ void GlutDisplay() {
 			}
 			worldToClampMatrix = Matrix4f::Scale(-1, -1, 1, 1) * worldToClampMatrix;
 
-			glBindBuffer(GL_UNIFORM_BUFFER, uniformBufferObjectMatrices);
+			glBindBuffer(GL_UNIFORM_BUFFER, UBOMatrices);
 			glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Matrix4f), &worldToClampMatrix.cell[0]);
 			glBindBuffer(GL_UNIFORM_BUFFER, 0);
 		}
 
-		// render environment cube
+#ifdef enable_env_cube
+		// render environment cube to reflection buffer
 		//{
 		//	glDepthMask(GL_FALSE);
 
@@ -378,6 +414,7 @@ void GlutDisplay() {
 
 		//	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 		//}
+#endif // enable_environment_cube
 
 		// render target object
 		{
@@ -443,11 +480,12 @@ void GlutDisplay() {
 			worldToClampMatrix.OrthogonalizeZ();
 		}
 
-		glBindBuffer(GL_UNIFORM_BUFFER, uniformBufferObjectMatrices);
+		glBindBuffer(GL_UNIFORM_BUFFER, UBOMatrices);
 		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Matrix4f), &worldToClampMatrix.cell[0]);
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 	}
 
+#ifdef enable_env_cube
 	// render environment cube
 	{
 		glDepthMask(GL_FALSE);
@@ -471,6 +509,7 @@ void GlutDisplay() {
 			break;
 		}
 	}
+#endif // enable_environment_cube
 
 	// render target object
 	// compute matrices here
@@ -518,7 +557,7 @@ void GlutDisplay() {
 		}
 	}
 
-	// render plane object
+	// render mirror plane object
 	{
 		Matrix4f objectToWorldMatrix = 
 			Matrix4f::Translation(planePosition) *
@@ -853,6 +892,7 @@ void SendDataToOpenGL(char objName[]) {
 		return;
 	}
 
+#ifdef enable_env_cube
 	// process cubemap textures
 	{
 		std::vector<Material::Texture> faces{
@@ -880,6 +920,7 @@ void SendDataToOpenGL(char objName[]) {
 		envCubeMapTexture->SetSeamless(true);
 		envCubeMapTexture->BuildMipmaps();
 	}
+#endif // enable_env_cube
 
 	// Plane data
 	{
@@ -906,7 +947,9 @@ void SendDataToOpenGL(char objName[]) {
 
 	baseObjectDiffuse->Bind(0);
 	baseObjectSpecular->Bind(1);
+#ifdef enable_env_cube
 	envCubeMapTexture->Bind(2);
+#endif // enable_env_cube
 }
 //-------------------------------------------------------------------------------
 
@@ -915,13 +958,21 @@ void InstallTeapotSceneShaders() {
 	fragmentShader = new GLSLShader();
 
 	targetObjectProgram = new GLSLProgram();
+
+#ifdef enable_env_cube
 	cubemapProgram = new GLSLProgram();
+#endif // enable_env_cube
+
 	planeProgram = new GLSLProgram();
 
 	CompileTeapotSceneShaders();
 
 	targetObjectProgram->RegisterUniforms(targetUniformNames);
+
+#ifdef enable_env_cube
 	cubemapProgram->RegisterUniforms(cubemapUniformNames);
+#endif // enable_env_cube
+
 	planeProgram->RegisterUniforms(planeUniformNames);
 }
 
@@ -929,6 +980,7 @@ void InstallTeapotSceneShaders() {
 
 void CompileTeapotSceneShaders() {
 	// base scene shaders
+#ifdef enable_env_cube
 	// env cubemap shader
 	{
 		if (vertexShader == NULL) {
@@ -952,6 +1004,7 @@ void CompileTeapotSceneShaders() {
 
 		cubemapProgram->SetUniform("skybox", 2);
 	}
+#endif // enable_env_cube
 
 	// target object shader
 	{
@@ -973,7 +1026,7 @@ void CompileTeapotSceneShaders() {
 		targetObjectProgram->AttachShader(fragmentShader->GetID());
 		targetObjectProgram->Link();
 
-		targetObjectProgram->SetUniform("brdfMode", 1);
+		targetObjectProgram->SetUniform("brdfMode", 0);
 		targetObjectProgram->SetUniform("diffuseTexture", 0);
 		targetObjectProgram->SetUniform("specularTexture", 1);
 		targetObjectProgram->SetUniform("skybox", 2);
@@ -998,40 +1051,13 @@ void CompileTeapotSceneShaders() {
 		planeProgram->AttachShader(vertexShader->GetID());
 		planeProgram->AttachShader(fragmentShader->GetID());
 		planeProgram->Link();
+		planeProgram->SetUniform("diffuseTexture", 0);
 		planeProgram->SetUniform("skybox", 2);
 		planeProgram->SetUniform("renderTexture", 3);
 	}
 
 	vertexShader->Delete();
 	fragmentShader->Delete();
-}
-
-//-------------------------------------------------------------------------------
-
-void InstallRTPlaneSceneShaders() {
-	vertexShader = new GLSLShader();
-	fragmentShader = new GLSLShader();
-
-	RTextureProgram = new GLSLProgram();
-	
-	if (!vertexShader->CompileFile(RTextureVertShaderPath, GL_VERTEX_SHADER)) {
-		return;
-	}
-	if (!fragmentShader->CompileFile(RTextureFragShaderPath, GL_FRAGMENT_SHADER)) {
-		return;
-	}
-
-	RTextureProgram->CreateProgram();
-	RTextureProgram->AttachShader(vertexShader->GetID());
-	RTextureProgram->AttachShader(fragmentShader->GetID());
-	RTextureProgram->Link();
-
-	RTextureProgram->SetUniform("renderTexture", 3);
-
-	vertexShader->Delete();
-	fragmentShader->Delete();
-
-	RTextureProgram->RegisterUniforms(RTPlaneSceneUniformNames);
 }
 
 //-------------------------------------------------------------------------------

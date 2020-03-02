@@ -41,7 +41,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
@@ -154,11 +154,13 @@ xcopy /E $(SolutionDir)$(ProjectName)\Data $(targetDir)Data\ /Y</Command>
     <ClCompile Include="viewport.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Data\SF_DiffPlane.glsl" />
     <None Include="Data\SF_TargetObj.glsl" />
     <None Include="Data\SF_Cubemap.glsl" />
-    <None Include="Data\SF_Plane.glsl" />
+    <None Include="Data\SF_RefPlane.glsl" />
     <None Include="Data\SV_Cubemap.glsl" />
-    <None Include="Data\SV_Plane.glsl" />
+    <None Include="Data\SV_DiffPlane.glsl" />
+    <None Include="Data\SV_RefPlane.glsl" />
     <None Include="Data\SV_TargetObj.glsl" />
   </ItemGroup>
   <ItemGroup>
