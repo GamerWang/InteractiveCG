@@ -58,12 +58,17 @@ enum RenderMode {
 
 //-------------------------------------------------------------------------------
 
-char targetVertShaderPath[30] = "Data\\SV_TargetObj.glsl";
-char targetFragShaderPath[30] = "Data\\SF_TargetObj.glsl";
+GLRenderTexture2D* reflectionFrameBuffer;
+
+//-------------------------------------------------------------------------------
+
 GLSLShader* vertexShader;
 GLSLShader* fragmentShader;
+GLSLShader* geometryShader;
+
+char targetVertShaderPath[30] = "Data\\SV_TargetObj.glsl";
+char targetFragShaderPath[30] = "Data\\SF_TargetObj.glsl";
 GLSLProgram* targetObjectProgram;
-GLRenderTexture2D* reflectionFrameBuffer;
 
 char RTextureVertShaderPath[30] = "Data\\SV_RTPlane.glsl";
 char RTextureFragShaderPath[30] = "Data\\SF_RTPlane.glsl";
@@ -73,6 +78,11 @@ char cubemapVertShaderPath[30] = "Data\\SV_Cubemap.glsl";
 char cubemapFragShaderPath[30] = "Data\\SF_Cubemap.glsl";
 GLSLProgram* cubemapProgram;
 
+char pointLightDepthVertShaderPath[30] = "Data\\PointShadowDepth_VS.glsl";
+char pointLightDepthFragShaderPath[30] = "Data\\PointShadowDepth_FS.glsl";
+char pointLightDepthGeomShaderPath[30] = "Data\\PointShadowDepth_GS.glsl";
+GLSLProgram* pointLightDepthProgram;
+
 #ifdef plane_reflective
 char planeVertShaderPath[30] = "Data\\SV_RefPlane.glsl";
 char planeFragShaderPath[30] = "Data\\SF_RefPlane.glsl";
@@ -81,7 +91,6 @@ char planeFragShaderPath[30] = "Data\\SF_RefPlane.glsl";
 char planeVertShaderPath[30] = "Data\\SV_DiffPlane.glsl";
 char planeFragShaderPath[30] = "Data\\SF_DiffPlane.glsl";
 #endif // plane_diffuse
-
 GLSLProgram* planeProgram;
 
 //-------------------------------------------------------------------------------
@@ -198,9 +207,13 @@ Camera* planeSceneCamera = nullptr;
 #define CAMERA_ROTATION_SPEED 0.001f
 #define CAMERA_MOVE_SPEED 0.03f
 
-//-------------------------------------------------------------------------------||TEMP variables
-GLuint framebuffer;
-GLuint textureColorBuffer;
+//-------------------------------------------------------------------------------
+
+GLuint depthMapFBO;
+GLuint depthCubemap;
+const GLuint SHADOW_WIDTH = 1024;
+const GLuint SHADOW_HEIGHT = 1024;
+
 //-------------------------------------------------------------------------------
 
 void GlutDisplay();
@@ -310,12 +323,41 @@ void ShowViewport(int argc, char* argv[]) {
 	baseObjectCenter = targetObject->GetBoundMax() + targetObject->GetBoundMin();
 	baseObjectCenter /= 2;
 
-	// initialize render texture buffer
-	reflectionFrameBuffer = new GLRenderTexture2D();
-	reflectionFrameBuffer->Initialize(true, 3, 800, 800);
-	reflectionFrameBuffer->BuildTextureMipmaps();
-	reflectionFrameBuffer->SetTextureFilteringMode(GL_LINEAR, GL_LINEAR);
-	reflectionFrameBuffer->SetTextureMaxAnisotropy();
+	// initialize reflection render texture buffer
+	{
+		reflectionFrameBuffer = new GLRenderTexture2D();
+		reflectionFrameBuffer->Initialize(true, 3, 800, 800);
+		reflectionFrameBuffer->BuildTextureMipmaps();
+		reflectionFrameBuffer->SetTextureFilteringMode(GL_LINEAR, GL_LINEAR);
+		reflectionFrameBuffer->SetTextureMaxAnisotropy();
+	}
+
+	// initialize depth map frame buffer
+	{
+		glGenFramebuffers(1, &depthMapFBO);
+		glGenTextures(1, &depthCubemap);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubemap);
+
+		for (GLuint i = 0; i < 6; i++) {
+			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT, 
+				SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+		}
+		
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+		// attach cubemap as depth map FBO's color buffer
+		glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+		glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depthCubemap, 0);
+		glDrawBuffer(GL_NONE);
+		glReadBuffer(GL_NONE);
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+			printf("Framebuffer not complete!\n");
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
 
 	// install shaders to opengl
 	InstallTeapotSceneShaders();
@@ -474,6 +516,34 @@ void GlutDisplay() {
 		reflectionFrameBuffer->Unbind();
 	}
 
+	// rendering depth to frame buffer
+	{
+		GLfloat aspect = (GLfloat)SHADOW_WIDTH / (GLfloat)SHADOW_HEIGHT;
+		GLfloat depthNear = 1.0f;
+		GLfloat depthFar = 200.0f;
+
+		Matrix4f shadowProj = Matrix4f::Perspective(90.0f, aspect, depthNear, depthFar);
+		std::vector<Matrix4f> shadowTransforms;
+		Vec3f lightp = pointLight0.GetPosition();
+		shadowTransforms.push_back(shadowProj* LookAtMatrix(lightp, lightp + Vec3f(1, 0, 0), Vec3f(0, -1, 0)));
+		shadowTransforms.push_back(shadowProj* LookAtMatrix(lightp, lightp + Vec3f(-1, 0, 0), Vec3f(0, -1, 0)));
+		shadowTransforms.push_back(shadowProj* LookAtMatrix(lightp, lightp + Vec3f(0, 1, 0), Vec3f(0, 0, 1)));
+		shadowTransforms.push_back(shadowProj* LookAtMatrix(lightp, lightp + Vec3f(0, -1, 0), Vec3f(0, 0, -1)));
+		shadowTransforms.push_back(shadowProj* LookAtMatrix(lightp, lightp + Vec3f(0, 0, 1), Vec3f(0, -1, 0)));
+		shadowTransforms.push_back(shadowProj* LookAtMatrix(lightp, lightp + Vec3f(0, 0, -1), Vec3f(0, -1, 0)));
+
+		// render to buffer
+		{
+			glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+
+			glClear(GL_DEPTH_BUFFER_BIT);
+
+
+
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		}
+	}
+
 	glClearColor(0, 0, 0, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
@@ -552,7 +622,6 @@ void GlutDisplay() {
 			Matrix3f::Scale(baseObjectScale).GetInverse() *
 			Matrix3f::RotationXYZ(-Pi<float>() / 2, 0, 0);
 
-		glBindVertexArray(baseVertexArrayObjectID);
 		targetObjectProgram->Bind();
 
 		targetObjectProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
@@ -564,6 +633,7 @@ void GlutDisplay() {
 
 		targetObjectProgram->SetUniform3("cameraPosition", 1, baseCamera->GetPosition().Elements());
 
+		glBindVertexArray(baseVertexArrayObjectID);
 		switch (renderMode)
 		{
 		case XW_RENDER_LINELOOP:
@@ -590,7 +660,6 @@ void GlutDisplay() {
 			worldNormal *= -1;
 		}
 
-		glBindVertexArray(TextureVertexArrayObjectID);
 		planeProgram->Bind();
 		reflectionFrameBuffer->BindTexture(3);
 
@@ -598,6 +667,7 @@ void GlutDisplay() {
 		planeProgram->SetUniform3("cameraPosition", 1, baseCamera->GetPosition().Elements());
 		planeProgram->SetUniform3("worldNormal", 1, worldNormal.Elements());
 
+		glBindVertexArray(TextureVertexArrayObjectID);
 		switch (renderMode)
 		{
 		case XW_RENDER_LINELOOP:
@@ -975,6 +1045,7 @@ void SendDataToOpenGL(char objName[]) {
 void InstallTeapotSceneShaders() {
 	vertexShader = new GLSLShader();
 	fragmentShader = new GLSLShader();
+	geometryShader = new GLSLShader();
 
 	targetObjectProgram = new GLSLProgram();
 
@@ -984,7 +1055,10 @@ void InstallTeapotSceneShaders() {
 
 	planeProgram = new GLSLProgram();
 
+	pointLightDepthProgram = new GLSLProgram();
+
 	CompileTeapotSceneShaders();
+
 
 	targetObjectProgram->RegisterUniforms(targetUniformNames);
 
@@ -1073,10 +1147,36 @@ void CompileTeapotSceneShaders() {
 		planeProgram->SetUniform("diffuseTexture", 0);
 		planeProgram->SetUniform("skybox", 2);
 		planeProgram->SetUniform("renderTexture", 3);
+		//planeProgram->SetUniform("depthMap");
+	}
+
+	// depth cube shader
+	{
+		if (vertexShader == NULL) {
+			vertexShader = new GLSLShader();
+		}
+		if (fragmentShader == NULL) {
+			fragmentShader = new GLSLShader();
+		}
+		if (geometryShader == NULL) {
+			geometryShader = new GLSLShader();
+		}
+		if (!vertexShader->CompileFile(pointLightDepthVertShaderPath, GL_VERTEX_SHADER)) {
+			return;
+		}
+		if (!fragmentShader->CompileFile(pointLightDepthFragShaderPath, GL_FRAGMENT_SHADER)) {
+			return;
+		}
+		if (!fragmentShader->CompileFile(pointLightDepthGeomShaderPath, GL_GEOMETRY_SHADER)) {
+			return;
+		}
+
+		pointLightDepthProgram->CreateProgram();
 	}
 
 	vertexShader->Delete();
 	fragmentShader->Delete();
+	geometryShader->Delete();
 }
 
 //-------------------------------------------------------------------------------

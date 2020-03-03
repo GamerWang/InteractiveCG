@@ -154,6 +154,9 @@ xcopy /E $(SolutionDir)$(ProjectName)\Data $(targetDir)Data\ /Y</Command>
     <ClCompile Include="viewport.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Data\PointShadowDepth_FS.glsl" />
+    <None Include="Data\PointShadowDepth_GS.glsl" />
+    <None Include="Data\PointShadowDepth_VS.glsl" />
     <None Include="Data\SF_DiffPlane.glsl" />
     <None Include="Data\SF_TargetObj.glsl" />
     <None Include="Data\SF_Cubemap.glsl" />

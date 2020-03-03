@@ -35,6 +35,40 @@ Matrix3f NavigationRotationMatrix(Vec2f start, Vec2f end) {
 
 //-------------------------------------------------------------------------------
 
+Matrix4f LookAtMatrix(const Vec3f eyePosition, const Vec3f aimPosition, const Vec3f UP) {
+	Matrix4f result;
+	
+	Vec3f forward = aimPosition - eyePosition;
+	forward.Normalize();
+	Vec3f side = forward.Cross(UP);
+	Vec3f up = side.Cross(forward);
+	
+	// --------------------------
+	result[0] = side.x;
+	result[4] = side.y;
+	result[8] = side.z;
+	result[12] = 0.0f;
+	// --------------------------
+	result[1] = up.x;
+	result[5] = up.y;
+	result[9] = up.z;
+	result[13] = 0.0f;
+	// --------------------------
+	result[2] = -forward.x;
+	result[6] = -forward.y;
+	result[10] = -forward.z;
+	result[14] = 0.0f;
+	// --------------------------
+	result[3] = result[7] = result[11] = 0.0;
+	result[15] = 1.0f;
+
+	result = Matrix4f::Translation(-eyePosition) * result;
+
+	return result;
+}
+
+//-------------------------------------------------------------------------------
+
 void TextureIDConverter(int id, GLint& outID) {
 	switch (id)
 	{
