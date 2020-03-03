@@ -109,6 +109,18 @@ char targetUniformNames[500] = {
 	" skybox"
 };
 
+char pointShadowUniformNames[500] = {
+	"model"
+	" lightPos"
+	" far_plane"
+	" shadowMatrices[0]"
+	" shadowMatrices[1]"
+	" shadowMatrices[2]"
+	" shadowMatrices[3]"
+	" shadowMatrices[4]"
+	" shadowMatrices[5]"
+};
+
 char planeUniformNames[500] = {
 	"objectToWorldMatrix"
 	" cameraPosition"
@@ -117,7 +129,6 @@ char planeUniformNames[500] = {
 	" diffuseTexture"
 #endif // plane_diffuse
 };
-
 
 char cubemapUniformNames[500] = {
 	"objectToWorldMatrix"
@@ -213,6 +224,8 @@ GLuint depthMapFBO;
 GLuint depthCubemap;
 const GLuint SHADOW_WIDTH = 1024;
 const GLuint SHADOW_HEIGHT = 1024;
+GLfloat depthNear = 1.0f;
+GLfloat depthFar = 200.0f;
 
 //-------------------------------------------------------------------------------
 
@@ -519,8 +532,6 @@ void GlutDisplay() {
 	// rendering depth to frame buffer
 	{
 		GLfloat aspect = (GLfloat)SHADOW_WIDTH / (GLfloat)SHADOW_HEIGHT;
-		GLfloat depthNear = 1.0f;
-		GLfloat depthFar = 200.0f;
 
 		Matrix4f shadowProj = Matrix4f::Perspective(90.0f, aspect, depthNear, depthFar);
 		std::vector<Matrix4f> shadowTransforms;
@@ -538,7 +549,45 @@ void GlutDisplay() {
 
 			glClear(GL_DEPTH_BUFFER_BIT);
 
+			pointLightDepthProgram->Bind();
+			for (GLuint i = 0; i < 6; i++) {
+				std::string targetMatrixName = "shadowMatrices[" + std::to_string(i) + "]";
+				pointLightDepthProgram->SetUniformMatrix4(
+					targetMatrixName.c_str(),
+					&shadowTransforms[i].cell[0]);
+			}
+			pointLightDepthProgram->SetUniform3("lightPos", 1, pointLight0.GetPosition().Elements());
 
+			// render scene
+			{
+				// render target object
+				{
+					Matrix4f objectToWorldMatrix =
+						Matrix4f::Translation(baseObjectPosition) *
+						Matrix4f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) *
+						Matrix4f::Scale(baseObjectScale) *
+						Matrix4f::RotationXYZ(-Pi<float>() / 2, 0, 0) *
+						Matrix4f::Translation(-baseObjectCenter);
+
+					pointLightDepthProgram->SetUniformMatrix4("model", &objectToWorldMatrix.cell[0]);
+
+					glBindVertexArray(baseVertexArrayObjectID);
+					glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
+				}
+
+				// render plane
+				{
+					Matrix4f objectToWorldMatrix =
+						Matrix4f::Translation(planePosition) *
+						Matrix4f::Scale(planeScale) *
+						Matrix4f::RotationXYZ(planeRotation.x, planeRotation.y, planeRotation.z);
+
+					pointLightDepthProgram->SetUniformMatrix4("model", &objectToWorldMatrix.cell[0]);
+
+					glBindVertexArray(TextureVertexArrayObjectID);
+					glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+				}
+			}
 
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
@@ -1172,6 +1221,11 @@ void CompileTeapotSceneShaders() {
 		}
 
 		pointLightDepthProgram->CreateProgram();
+		pointLightDepthProgram->AttachShader(vertexShader->GetID());
+		pointLightDepthProgram->AttachShader(fragmentShader->GetID());
+		pointLightDepthProgram->AttachShader(geometryShader->GetID());
+		pointLightDepthProgram->Link();
+		pointLightDepthProgram->SetUniform1("far_plane", 1, &depthFar);
 	}
 
 	vertexShader->Delete();
