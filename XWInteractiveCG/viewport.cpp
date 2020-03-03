@@ -94,8 +94,6 @@ char targetUniformNames[500] = {
 	//" specularColor"
 	" cameraPosition"
 	" clipPlane"
-	" pointLight0pos"
-	" pointLight0Intensity"
 	" brdfMode"
 	" diffuseTexture"
 	" specularTexture"
@@ -354,9 +352,14 @@ void ShowViewport(int argc, char* argv[]) {
 			GLuint uniformBlockIndexBaseFrag = glGetUniformBlockIndex(targetObjectProgram->GetID(), "Lights");
 			glUniformBlockBinding(targetObjectProgram->GetID(), uniformBlockIndexBaseFrag, 1);
 
+#ifdef plane_diffuse
+			GLuint uniformBlockIndexPlaneFrag = glGetUniformBlockIndex(planeProgram->GetID(), "Lights");
+			glUniformBlockBinding(planeProgram->GetID(), uniformBlockIndexPlaneFrag, 1);
+#endif // plane_diffuse
+
 			glGenBuffers(1, &UBOLights);
 			glBindBuffer(GL_UNIFORM_BUFFER, UBOLights);
-			glBufferData(GL_UNIFORM_BUFFER, sizeof(Vec3f) * 3, NULL, GL_STATIC_DRAW);
+			glBufferData(GL_UNIFORM_BUFFER, sizeof(float) * 16, NULL, GL_STATIC_DRAW);
 			glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
 			glBindBufferRange(GL_UNIFORM_BUFFER, 1, UBOLights, 0, sizeof(Vec3f) * 3);
@@ -396,6 +399,17 @@ void GlutDisplay() {
 
 			glBindBuffer(GL_UNIFORM_BUFFER, UBOMatrices);
 			glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Matrix4f), &worldToClampMatrix.cell[0]);
+			glBindBuffer(GL_UNIFORM_BUFFER, 0);
+		}
+
+		// send point light info to uniform buffer object
+		{
+			glBindBuffer(GL_UNIFORM_BUFFER, UBOLights);
+
+			glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Vec3f), ambientLight.GetIntensity().Elements());
+			glBufferSubData(GL_UNIFORM_BUFFER, sizeof(float) * 4, sizeof(Vec3f), pointLight0.GetIntensity().Elements());
+			glBufferSubData(GL_UNIFORM_BUFFER, sizeof(float) * 8, sizeof(Vec3f), pointLight0.GetPosition().Elements());
+
 			glBindBuffer(GL_UNIFORM_BUFFER, 0);
 		}
 
@@ -451,9 +465,6 @@ void GlutDisplay() {
 			targetObjectProgram->SetUniform3("specularColor", 1, baseObjectSpecularColor.Elements());
 
 			targetObjectProgram->SetUniform3("cameraPosition", 1, reflectionCam.GetPosition().Elements());
-			targetObjectProgram->SetUniform3("ambientLight", 1, ambientLight.GetIntensity().Elements());
-			targetObjectProgram->SetUniform3("pointLight0pos", 1, pointLight0.GetPosition().Elements());
-			targetObjectProgram->SetUniform3("pointLight0Intensity", 1, pointLight0.GetIntensity().Elements());
 
 			targetObjectProgram->SetUniform4("clipPlane", 1, clipPlane.Elements());
 
@@ -482,6 +493,17 @@ void GlutDisplay() {
 
 		glBindBuffer(GL_UNIFORM_BUFFER, UBOMatrices);
 		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Matrix4f), &worldToClampMatrix.cell[0]);
+		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+	}
+
+	// send point light info to uniform buffer object
+	{
+		glBindBuffer(GL_UNIFORM_BUFFER, UBOLights);
+
+		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Vec3f), ambientLight.GetIntensity().Elements());
+		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(float) * 4, sizeof(Vec3f), pointLight0.GetIntensity().Elements());
+		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(float) * 8, sizeof(Vec3f), pointLight0.GetPosition().Elements());
+
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 	}
 
@@ -541,9 +563,6 @@ void GlutDisplay() {
 		targetObjectProgram->SetUniform3("specularColor", 1, baseObjectSpecularColor.Elements());
 
 		targetObjectProgram->SetUniform3("cameraPosition", 1, baseCamera->GetPosition().Elements());
-		targetObjectProgram->SetUniform3("ambientLight", 1, ambientLight.GetIntensity().Elements());
-		targetObjectProgram->SetUniform3("pointLight0pos", 1, pointLight0.GetPosition().Elements());
-		targetObjectProgram->SetUniform3("pointLight0Intensity", 1, pointLight0.GetIntensity().Elements());
 
 		switch (renderMode)
 		{
@@ -557,7 +576,7 @@ void GlutDisplay() {
 		}
 	}
 
-	// render mirror plane object
+	// render plane object
 	{
 		Matrix4f objectToWorldMatrix = 
 			Matrix4f::Translation(planePosition) *
