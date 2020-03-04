@@ -80,6 +80,12 @@
     <None Include="Data\PointShadowDepth_GS.glsl">
       <Filter>Source Files\Data\Shaders</Filter>
     </None>
+    <None Include="Data\RayMarching_FS.glsl">
+      <Filter>Source Files\Data\Shaders</Filter>
+    </None>
+    <None Include="Data\RayMarching_VS.glsl">
+      <Filter>Source Files\Data\Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Programs\cyCore.h">

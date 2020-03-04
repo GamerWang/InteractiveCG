@@ -88,8 +88,8 @@ char planeVertShaderPath[30] = "Data\\SV_RefPlane.glsl";
 char planeFragShaderPath[30] = "Data\\SF_RefPlane.glsl";
 #endif // plane_reflective
 #ifdef plane_diffuse
-char planeVertShaderPath[30] = "Data\\SV_DiffPlane.glsl";
-char planeFragShaderPath[30] = "Data\\SF_DiffPlane.glsl";
+char planeVertShaderPath[30] = "Data\\RayMarching_VS.glsl";
+char planeFragShaderPath[30] = "Data\\RayMarching_FS.glsl";
 #endif // plane_diffuse
 GLSLProgram* planeProgram;
 
@@ -122,11 +122,9 @@ char pointShadowUniformNames[500] = {
 };
 
 char planeUniformNames[500] = {
-	"objectToWorldMatrix"
-	" cameraPosition"
-	" worldNormal"
+	"time"
 #ifdef plane_diffuse
-	" diffuseTexture"
+	//" diff
 #endif // plane_diffuse
 };
 
@@ -266,9 +264,9 @@ void ShowViewport(int argc, char* argv[]) {
 	// center cut position
 	//planePosition = Vec3f(0, -8, 0);
 	// below teapot position
-	planePosition = Vec3f(0, -12, 0);
-	planeScale = Vec3f(40);
-	planeRotation = Vec3f(-Pi<float>() / 2, 0, 0);
+	planePosition = Vec3f(0, 0, 0);
+	planeScale = Vec3f(50);
+	planeRotation = Vec3f(0, 0, 0);
 
 	bgColor = new Vec3f(0, 0, 0);
 
@@ -530,7 +528,7 @@ void GlutDisplay() {
 	}
 
 	// rendering depth to frame buffer
-	{
+	/*{
 		GLfloat aspect = (GLfloat)SHADOW_WIDTH / (GLfloat)SHADOW_HEIGHT;
 
 		Matrix4f shadowProj = Matrix4f::Perspective(90.0f, aspect, depthNear, depthFar);
@@ -591,7 +589,7 @@ void GlutDisplay() {
 
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
-	}
+	}*/
 
 	glClearColor(0, 0, 0, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -653,7 +651,7 @@ void GlutDisplay() {
 #endif // enable_environment_cube
 
 	// render target object
-	// compute matrices here
+	/*// compute matrices here
 	{
 		glDepthMask(GL_TRUE);
 		glDisable(GL_CLIP_DISTANCE0);
@@ -693,7 +691,7 @@ void GlutDisplay() {
 			glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
 			break;
 		}
-	}
+	}*/
 
 	// render plane object
 	{
@@ -709,12 +707,14 @@ void GlutDisplay() {
 			worldNormal *= -1;
 		}
 
+		clock_t t;
+		t = clock();
+		float tFrac = t / 1000.0f;
+
 		planeProgram->Bind();
 		reflectionFrameBuffer->BindTexture(3);
 
-		planeProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
-		planeProgram->SetUniform3("cameraPosition", 1, baseCamera->GetPosition().Elements());
-		planeProgram->SetUniform3("worldNormal", 1, worldNormal.Elements());
+		planeProgram->SetUniform1("time", 1, &tFrac);
 
 		glBindVertexArray(TextureVertexArrayObjectID);
 		switch (renderMode)
