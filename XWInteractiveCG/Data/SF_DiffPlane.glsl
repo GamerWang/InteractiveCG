@@ -7,6 +7,7 @@ in vec3 worldPosition;
 
 uniform vec3 worldNormal;
 uniform vec3 cameraPosition;
+uniform float far_plane;
 
 layout (std140) uniform Lights{
 	vec3 ambientLight;
@@ -15,6 +16,22 @@ layout (std140) uniform Lights{
 };
 
 uniform sampler2D diffuseTexture;
+uniform samplerCube depthMap;
+
+float ShadowCalculation(vec3 fragPos){
+	float shadow = 0;
+	vec3 fragToLight = fragPos - pointLight0pos;
+	float closestDepth = texture(depthMap, fragToLight).r;
+
+	closestDepth *= far_plane;
+
+	float currentDepth = length(fragToLight);
+
+	float bias = 2.00;
+	shadow = currentDepth - bias > closestDepth ? 1.:0.;
+
+	return shadow;
+}
 
 void main(){
 	vec3 viewDir = normalize(cameraPosition - worldPosition);
@@ -26,6 +43,7 @@ void main(){
 	float viewTerm = dot(worldNormal, viewDir);
 	viewTerm = ceil(viewTerm);
 	viewTerm = clamp(viewTerm, 0, 1);
+
 
 	// handling pointLight0
 	// diffuse part
@@ -40,9 +58,12 @@ void main(){
 
 	diffuse *= diffuseColor;
 	ambient *= diffuseColor;
+	
+	// handling shadows
+	float shadow = ShadowCalculation(worldPosition);
 
 	daColor = vec4(
-		diffuse + ambient,
+		diffuse * (1.-shadow) + ambient,
 		1
 	);
 }

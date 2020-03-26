@@ -78,9 +78,9 @@ char cubemapVertShaderPath[30] = "Data\\SV_Cubemap.glsl";
 char cubemapFragShaderPath[30] = "Data\\SF_Cubemap.glsl";
 GLSLProgram* cubemapProgram;
 
-char pointLightDepthVertShaderPath[30] = "Data\\PointShadowDepth_VS.glsl";
-char pointLightDepthFragShaderPath[30] = "Data\\PointShadowDepth_FS.glsl";
-char pointLightDepthGeomShaderPath[30] = "Data\\PointShadowDepth_GS.glsl";
+char pointLightDepthVertShaderPath[40] = "Data\\PointShadowDepth_VS.glsl";
+char pointLightDepthFragShaderPath[40] = "Data\\PointShadowDepth_FS.glsl";
+char pointLightDepthGeomShaderPath[40] = "Data\\PointShadowDepth_GS.glsl";
 GLSLProgram* pointLightDepthProgram;
 
 #ifdef plane_reflective
@@ -107,6 +107,8 @@ char targetUniformNames[500] = {
 	" diffuseTexture"
 	" specularTexture"
 	" skybox"
+	" depthMap"
+	" far_plane"
 };
 
 char pointShadowUniformNames[500] = {
@@ -123,10 +125,12 @@ char pointShadowUniformNames[500] = {
 
 char planeUniformNames[500] = {
 	"objectToWorldMatrix"
-	" cameraPosition"
+	//" cameraPosition"
 	" worldNormal"
 #ifdef plane_diffuse
 	" diffuseTexture"
+	" depthMap"
+	" far_plane"
 #endif // plane_diffuse
 };
 
@@ -267,7 +271,7 @@ void ShowViewport(int argc, char* argv[]) {
 	//planePosition = Vec3f(0, -8, 0);
 	// below teapot position
 	planePosition = Vec3f(0, -12, 0);
-	planeScale = Vec3f(40);
+	planeScale = Vec3f(280);
 	planeRotation = Vec3f(-Pi<float>() / 2, 0, 0);
 
 	bgColor = new Vec3f(0, 0, 0);
@@ -320,6 +324,7 @@ void ShowViewport(int argc, char* argv[]) {
 	
 	glewInit();
 	glEnable(GL_DEPTH_TEST);
+	//glEnable(GL_CULL_FACE);
 
 	// prepare data for opengl
 	if (argc <= 1) {
@@ -352,8 +357,10 @@ void ShowViewport(int argc, char* argv[]) {
 		glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubemap);
 
 		for (GLuint i = 0; i < 6; i++) {
-			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT, 
-				SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+			glTexImage2D(
+				GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT, 
+				SHADOW_WIDTH, SHADOW_HEIGHT, 0, 
+				GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 		}
 		
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -396,11 +403,11 @@ void ShowViewport(int argc, char* argv[]) {
 			// now create the buffer
 			glGenBuffers(1, &UBOMatrices);
 			glBindBuffer(GL_UNIFORM_BUFFER, UBOMatrices);
-			glBufferData(GL_UNIFORM_BUFFER, sizeof(Matrix4f), NULL, GL_STATIC_DRAW);
+			glBufferData(GL_UNIFORM_BUFFER, sizeof(Matrix4f) * 3, NULL, GL_STATIC_DRAW);
 			glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
 			// define the range of the buffer that links to a uniform binding point
-			glBindBufferRange(GL_UNIFORM_BUFFER, 0, UBOMatrices, 0, sizeof(Matrix4f));
+			glBindBufferRange(GL_UNIFORM_BUFFER, 0, UBOMatrices, 0, sizeof(Matrix4f) * 3);
 		}
 		// lights buffer object
 		{
@@ -429,6 +436,7 @@ void ShowViewport(int argc, char* argv[]) {
 void GlutDisplay() {
 	// rendering the teapot reflection to target buffer
 	{
+		glViewport(0, 0, screenSize[0], screenSize[1]);
 		reflectionFrameBuffer->Bind();
 
 		glClearColor(0, 0, 0, 1.0f);
@@ -533,29 +541,33 @@ void GlutDisplay() {
 	{
 		GLfloat aspect = (GLfloat)SHADOW_WIDTH / (GLfloat)SHADOW_HEIGHT;
 
-		Matrix4f shadowProj = Matrix4f::Perspective(90.0f, aspect, depthNear, depthFar);
+		Matrix4f shadowProj = Matrix4f::Perspective(Pi<float>() / 2 , aspect, depthNear, depthFar);
 		std::vector<Matrix4f> shadowTransforms;
 		Vec3f lightp = pointLight0.GetPosition();
-		shadowTransforms.push_back(shadowProj* LookAtMatrix(lightp, lightp + Vec3f(1, 0, 0), Vec3f(0, -1, 0)));
-		shadowTransforms.push_back(shadowProj* LookAtMatrix(lightp, lightp + Vec3f(-1, 0, 0), Vec3f(0, -1, 0)));
-		shadowTransforms.push_back(shadowProj* LookAtMatrix(lightp, lightp + Vec3f(0, 1, 0), Vec3f(0, 0, 1)));
-		shadowTransforms.push_back(shadowProj* LookAtMatrix(lightp, lightp + Vec3f(0, -1, 0), Vec3f(0, 0, -1)));
-		shadowTransforms.push_back(shadowProj* LookAtMatrix(lightp, lightp + Vec3f(0, 0, 1), Vec3f(0, -1, 0)));
-		shadowTransforms.push_back(shadowProj* LookAtMatrix(lightp, lightp + Vec3f(0, 0, -1), Vec3f(0, -1, 0)));
+		shadowTransforms.push_back(shadowProj* Matrix4f::View(lightp, lightp + Vec3f( 1,  0,  0), Vec3f(0, -1,  0)));
+		shadowTransforms.push_back(shadowProj* Matrix4f::View(lightp, lightp + Vec3f(-1,  0,  0), Vec3f(0, -1,  0)));
+		shadowTransforms.push_back(shadowProj* Matrix4f::View(lightp, lightp + Vec3f( 0,  1,  0), Vec3f(0,  0,  1)));
+		shadowTransforms.push_back(shadowProj* Matrix4f::View(lightp, lightp + Vec3f( 0, -1,  0), Vec3f(0,  0, -1)));
+		shadowTransforms.push_back(shadowProj* Matrix4f::View(lightp, lightp + Vec3f( 0,  0,  1), Vec3f(0, -1,  0)));
+		shadowTransforms.push_back(shadowProj* Matrix4f::View(lightp, lightp + Vec3f( 0,  0, -1), Vec3f(0, -1,  0)));
 
 		// render to buffer
 		{
+			glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+			glDepthMask(GL_TRUE);
+			glEnable(GL_DEPTH_TEST);
 			glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-
 			glClear(GL_DEPTH_BUFFER_BIT);
 
 			pointLightDepthProgram->Bind();
+
 			for (GLuint i = 0; i < 6; i++) {
 				std::string targetMatrixName = "shadowMatrices[" + std::to_string(i) + "]";
 				pointLightDepthProgram->SetUniformMatrix4(
 					targetMatrixName.c_str(),
 					&shadowTransforms[i].cell[0]);
 			}
+			pointLightDepthProgram->SetUniform1("far_plane", 1, &depthFar);
 			pointLightDepthProgram->SetUniform3("lightPos", 1, pointLight0.GetPosition().Elements());
 
 			// render scene
@@ -593,6 +605,10 @@ void GlutDisplay() {
 		}
 	}
 
+	// render scene as normal
+	glViewport(0, 0, screenSize[0], screenSize[1]);
+	glDepthMask(GL_TRUE);
+	glEnable(GL_DEPTH_TEST);
 	glClearColor(0, 0, 0, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
@@ -610,8 +626,12 @@ void GlutDisplay() {
 			worldToClampMatrix.OrthogonalizeZ();
 		}
 
+		Matrix4f viewToProjectionMatrix = baseCamera->ViewToProjectionMatrix();
+
 		glBindBuffer(GL_UNIFORM_BUFFER, UBOMatrices);
 		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Matrix4f), &worldToClampMatrix.cell[0]);
+		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(Matrix4f), sizeof(Matrix4f), &worldToViewMatrix.cell[0]);
+		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(Matrix4f) * 2, sizeof(Matrix4f), &viewToProjectionMatrix.cell[0]);
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 	}
 
@@ -652,6 +672,7 @@ void GlutDisplay() {
 	}
 #endif // enable_environment_cube
 
+
 	// render target object
 	// compute matrices here
 	{
@@ -667,6 +688,49 @@ void GlutDisplay() {
 			Matrix4f::Translation(-baseObjectCenter);
 
 		Matrix3f objectNormalToWorldMatrix = 
+			Matrix3f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) *
+			Matrix3f::Scale(baseObjectScale).GetInverse() *
+			Matrix3f::RotationXYZ(-Pi<float>() / 2, 0, 0);
+
+		targetObjectProgram->Bind();
+
+		targetObjectProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
+		targetObjectProgram->SetUniformMatrix3("objectNormalToWorldMatrix", &objectNormalToWorldMatrix.cell[0]);
+		targetObjectProgram->SetUniform1("far_plane", 1, &depthFar);
+
+		targetObjectProgram->SetUniform1("glossiness", 1, &baseObjectGlossiness);
+		targetObjectProgram->SetUniform3("diffuseColor", 1, baseObjectDiffuseColor.Elements());
+		targetObjectProgram->SetUniform3("specularColor", 1, baseObjectSpecularColor.Elements());
+
+		targetObjectProgram->SetUniform3("cameraPosition", 1, baseCamera->GetPosition().Elements());
+
+		glActiveTexture(GL_TEXTURE3);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubemap);
+
+		glBindVertexArray(baseVertexArrayObjectID);
+		switch (renderMode)
+		{
+		case XW_RENDER_LINELOOP:
+			glDrawElements(GL_LINE_LOOP, baseNumIndices, GL_UNSIGNED_INT, 0);
+			break;
+		case XW_RENDER_TRIANGLES:
+		default:
+			glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
+			break;
+		}
+	}
+
+	// render light object temp
+	{
+		// send uniforms here
+		Matrix4f objectToWorldMatrix =
+			Matrix4f::Translation(pointLight0.GetPosition()) *
+			Matrix4f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) *
+			Matrix4f::Scale(0.2f) *
+			Matrix4f::RotationXYZ(-Pi<float>() / 2, 0, 0) *
+			Matrix4f::Translation(-baseObjectCenter);
+
+		Matrix3f objectNormalToWorldMatrix =
 			Matrix3f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) *
 			Matrix3f::Scale(baseObjectScale).GetInverse() *
 			Matrix3f::RotationXYZ(-Pi<float>() / 2, 0, 0);
@@ -715,6 +779,10 @@ void GlutDisplay() {
 		planeProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
 		planeProgram->SetUniform3("cameraPosition", 1, baseCamera->GetPosition().Elements());
 		planeProgram->SetUniform3("worldNormal", 1, worldNormal.Elements());
+		planeProgram->SetUniform1("far_plane", 1, &depthFar);
+
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubemap);
 
 		glBindVertexArray(TextureVertexArrayObjectID);
 		switch (renderMode)
@@ -728,6 +796,7 @@ void GlutDisplay() {
 			break;
 		}
 	}
+
 
 	glutSwapBuffers();
 }
@@ -1171,6 +1240,7 @@ void CompileTeapotSceneShaders() {
 		targetObjectProgram->SetUniform("brdfMode", 0);
 		targetObjectProgram->SetUniform("diffuseTexture", 0);
 		targetObjectProgram->SetUniform("specularTexture", 1);
+		targetObjectProgram->SetUniform("depthMap", 3);
 		targetObjectProgram->SetUniform("skybox", 2);
 	}
 
@@ -1194,9 +1264,9 @@ void CompileTeapotSceneShaders() {
 		planeProgram->AttachShader(fragmentShader->GetID());
 		planeProgram->Link();
 		planeProgram->SetUniform("diffuseTexture", 0);
+		planeProgram->SetUniform("depthMap", 1);
 		planeProgram->SetUniform("skybox", 2);
 		planeProgram->SetUniform("renderTexture", 3);
-		//planeProgram->SetUniform("depthMap");
 	}
 
 	// depth cube shader
@@ -1216,14 +1286,14 @@ void CompileTeapotSceneShaders() {
 		if (!fragmentShader->CompileFile(pointLightDepthFragShaderPath, GL_FRAGMENT_SHADER)) {
 			return;
 		}
-		if (!fragmentShader->CompileFile(pointLightDepthGeomShaderPath, GL_GEOMETRY_SHADER)) {
+		if (!geometryShader->CompileFile(pointLightDepthGeomShaderPath, GL_GEOMETRY_SHADER)) {
 			return;
 		}
 
 		pointLightDepthProgram->CreateProgram();
 		pointLightDepthProgram->AttachShader(vertexShader->GetID());
-		pointLightDepthProgram->AttachShader(fragmentShader->GetID());
 		pointLightDepthProgram->AttachShader(geometryShader->GetID());
+		pointLightDepthProgram->AttachShader(fragmentShader->GetID());
 		pointLightDepthProgram->Link();
 		pointLightDepthProgram->SetUniform1("far_plane", 1, &depthFar);
 	}

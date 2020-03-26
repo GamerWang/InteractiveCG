@@ -11,6 +11,7 @@ uniform float glossiness;
 //uniform vec3 specularColor;
 
 uniform vec3 cameraPosition;
+uniform float far_plane;
 
 layout (std140) uniform Lights{
 	vec3 ambientLight;
@@ -22,8 +23,24 @@ uniform int brdfMode;
 
 uniform sampler2D diffuseTexture;
 uniform sampler2D specularTexture;
+uniform samplerCube depthMap;
 
 uniform samplerCube skybox;
+
+float ShadowCalculation(vec3 fragPos){
+	float shadow = 0;
+	vec3 fragToLight = fragPos - pointLight0pos;
+	float closestDepth = texture(depthMap, fragToLight).r;
+
+	closestDepth *= far_plane;
+
+	float currentDepth = length(fragToLight);
+
+	float bias = 0.55;
+	shadow = currentDepth - bias > closestDepth ? 1.:0.;
+
+	return shadow;
+}
 
 void main(){
 
@@ -53,17 +70,19 @@ void main(){
 	specular += specularTerm * pointLight0Intensity;
 
 	vec3 ambient = ambientLight;
+
+	float shadow = ShadowCalculation(worldPosition);
 	
 	if(brdfMode == 0){
 		// sample diffuse texture color
 		vec4 diffuseTextureColor = texture(diffuseTexture, texcoord);
 		vec4 specularTextureColor = texture(specularTexture, texcoord);
-		diffuse *= vec3(diffuseTextureColor);
-		specular *= vec3(specularTextureColor);
+		diffuse *= vec3(diffuseTextureColor * (1.-shadow));
+		specular *= vec3(specularTextureColor * (1.-shadow));
 		ambient *= vec3(diffuseTextureColor);
 		daColor = vec4(viewTerm*(diffuse + specular) + ambient, 1.0);
 	}else if(brdfMode == 1){
 		vec3 reflecColor = texture(skybox, reflectDir).rgb;
-		daColor = vec4(diffuse*.6 + specular + reflecColor*.5 + ambient*.5, 1.0);
+		daColor = vec4(diffuse *.6 * (1.-shadow) + specular * (1.-shadow) + reflecColor*.5 + ambient*.5, 1.0);
 	}
 }

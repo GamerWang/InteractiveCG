@@ -10,6 +10,8 @@ out vec3 worldPosition;
 
 layout (std140) uniform Matrices{
 	mat4 worldToClamp;
+	mat4 worldToView;
+	mat4 viewToProj;
 };
 
 uniform mat4 objectToWorldMatrix;
