@@ -154,6 +154,9 @@ xcopy /E $(SolutionDir)$(ProjectName)\Data $(targetDir)Data\ /Y</Command>
     <ClCompile Include="viewport.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Data\PlaneShowTri_FS.glsl" />
+    <None Include="Data\PlaneShowTri_GS.glsl" />
+    <None Include="Data\PlaneShowTri_VS.glsl" />
     <None Include="Data\PointLightObject_FS.glsl" />
     <None Include="Data\PointLightObject_VS.glsl" />
     <None Include="Data\PointShadowDepth_FS.glsl" />

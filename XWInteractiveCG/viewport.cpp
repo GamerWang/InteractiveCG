@@ -93,6 +93,12 @@ char planeFragShaderPath[30] = "Data\\SF_DiffPlane.glsl";
 #endif // plane_diffuse
 GLSLProgram* planeProgram;
 
+char planeShowTriVertShaderPath[30] = "Data\\PlaneShowTri_VS.glsl";
+char planeShowTriGeomShaderPath[30] = "Data\\PlaneShowTri_GS.glsl";
+char planeShowTriFragShaderPath[30] = "Data\\PlaneShowTri_FS.glsl";
+GLSLProgram* planeTriProgram;
+
+
 //-------------------------------------------------------------------------------
 
 char targetUniformNames[500] = {
@@ -127,8 +133,9 @@ char planeUniformNames[500] = {
 	"objectToWorldMatrix"
 	//" cameraPosition"
 	" worldNormal"
+	" tangent"
 #ifdef plane_diffuse
-	" diffuseTexture"
+	" normalMap"
 	" depthMap"
 	" far_plane"
 #endif // plane_diffuse
@@ -209,6 +216,11 @@ float baseObjectGlossiness;
 
 //-------------------------------------------------------------------------------
 
+cyGLTexture2D* planeNormalTexture;
+cyGLTexture2D* planeDisplacementTexture;
+
+//-------------------------------------------------------------------------------
+
 Light ambientLight = Light();
 PointLight pointLight0 = PointLight();
 DirectionalLight dirLight0 = DirectionalLight();
@@ -271,7 +283,7 @@ void ShowViewport(int argc, char* argv[]) {
 	//planePosition = Vec3f(0, -8, 0);
 	// below teapot position
 	planePosition = Vec3f(0, -12, 0);
-	planeScale = Vec3f(280);
+	planeScale = Vec3f(40);
 	planeRotation = Vec3f(-Pi<float>() / 2, 0, 0);
 
 	bgColor = new Vec3f(0, 0, 0);
@@ -572,20 +584,20 @@ void GlutDisplay() {
 
 			// render scene
 			{
-				// render target object
-				{
-					Matrix4f objectToWorldMatrix =
-						Matrix4f::Translation(baseObjectPosition) *
-						Matrix4f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) *
-						Matrix4f::Scale(baseObjectScale) *
-						Matrix4f::RotationXYZ(-Pi<float>() / 2, 0, 0) *
-						Matrix4f::Translation(-baseObjectCenter);
+				//// render target object
+				//{
+				//	Matrix4f objectToWorldMatrix =
+				//		Matrix4f::Translation(baseObjectPosition) *
+				//		Matrix4f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) *
+				//		Matrix4f::Scale(baseObjectScale) *
+				//		Matrix4f::RotationXYZ(-Pi<float>() / 2, 0, 0) *
+				//		Matrix4f::Translation(-baseObjectCenter);
 
-					pointLightDepthProgram->SetUniformMatrix4("model", &objectToWorldMatrix.cell[0]);
+				//	pointLightDepthProgram->SetUniformMatrix4("model", &objectToWorldMatrix.cell[0]);
 
-					glBindVertexArray(baseVertexArrayObjectID);
-					glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
-				}
+				//	glBindVertexArray(baseVertexArrayObjectID);
+				//	glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
+				//}
 
 				// render plane
 				{
@@ -673,52 +685,52 @@ void GlutDisplay() {
 #endif // enable_environment_cube
 
 
-	// render target object
-	// compute matrices here
-	{
-		glDepthMask(GL_TRUE);
-		glDisable(GL_CLIP_DISTANCE0);
+	//// render target object
+	//// compute matrices here
+	//{
+	//	glDepthMask(GL_TRUE);
+	//	glDisable(GL_CLIP_DISTANCE0);
 
-		// send uniforms here
-		Matrix4f objectToWorldMatrix =
-			Matrix4f::Translation(baseObjectPosition) *
-			Matrix4f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) *
-			Matrix4f::Scale(baseObjectScale) *
-			Matrix4f::RotationXYZ(-Pi<float>() / 2, 0, 0) *
-			Matrix4f::Translation(-baseObjectCenter);
+	//	// send uniforms here
+	//	Matrix4f objectToWorldMatrix =
+	//		Matrix4f::Translation(baseObjectPosition) *
+	//		Matrix4f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) *
+	//		Matrix4f::Scale(baseObjectScale) *
+	//		Matrix4f::RotationXYZ(-Pi<float>() / 2, 0, 0) *
+	//		Matrix4f::Translation(-baseObjectCenter);
 
-		Matrix3f objectNormalToWorldMatrix = 
-			Matrix3f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) *
-			Matrix3f::Scale(baseObjectScale).GetInverse() *
-			Matrix3f::RotationXYZ(-Pi<float>() / 2, 0, 0);
+	//	Matrix3f objectNormalToWorldMatrix = 
+	//		Matrix3f::RotationXYZ(baseObjectRotation.x, baseObjectRotation.y, baseObjectRotation.z) *
+	//		Matrix3f::Scale(baseObjectScale).GetInverse() *
+	//		Matrix3f::RotationXYZ(-Pi<float>() / 2, 0, 0);
 
-		targetObjectProgram->Bind();
+	//	targetObjectProgram->Bind();
 
-		targetObjectProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
-		targetObjectProgram->SetUniformMatrix3("objectNormalToWorldMatrix", &objectNormalToWorldMatrix.cell[0]);
-		targetObjectProgram->SetUniform1("far_plane", 1, &depthFar);
+	//	targetObjectProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
+	//	targetObjectProgram->SetUniformMatrix3("objectNormalToWorldMatrix", &objectNormalToWorldMatrix.cell[0]);
+	//	targetObjectProgram->SetUniform1("far_plane", 1, &depthFar);
 
-		targetObjectProgram->SetUniform1("glossiness", 1, &baseObjectGlossiness);
-		targetObjectProgram->SetUniform3("diffuseColor", 1, baseObjectDiffuseColor.Elements());
-		targetObjectProgram->SetUniform3("specularColor", 1, baseObjectSpecularColor.Elements());
+	//	targetObjectProgram->SetUniform1("glossiness", 1, &baseObjectGlossiness);
+	//	targetObjectProgram->SetUniform3("diffuseColor", 1, baseObjectDiffuseColor.Elements());
+	//	targetObjectProgram->SetUniform3("specularColor", 1, baseObjectSpecularColor.Elements());
 
-		targetObjectProgram->SetUniform3("cameraPosition", 1, baseCamera->GetPosition().Elements());
+	//	targetObjectProgram->SetUniform3("cameraPosition", 1, baseCamera->GetPosition().Elements());
 
-		glActiveTexture(GL_TEXTURE3);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubemap);
+	//	glActiveTexture(GL_TEXTURE3);
+	//	glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubemap);
 
-		glBindVertexArray(baseVertexArrayObjectID);
-		switch (renderMode)
-		{
-		case XW_RENDER_LINELOOP:
-			glDrawElements(GL_LINE_LOOP, baseNumIndices, GL_UNSIGNED_INT, 0);
-			break;
-		case XW_RENDER_TRIANGLES:
-		default:
-			glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
-			break;
-		}
-	}
+	//	glBindVertexArray(baseVertexArrayObjectID);
+	//	switch (renderMode)
+	//	{
+	//	case XW_RENDER_LINELOOP:
+	//		glDrawElements(GL_LINE_LOOP, baseNumIndices, GL_UNSIGNED_INT, 0);
+	//		break;
+	//	case XW_RENDER_TRIANGLES:
+	//	default:
+	//		glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
+	//		break;
+	//	}
+	//}
 
 	// render light object temp
 	{
@@ -769,8 +781,12 @@ void GlutDisplay() {
 		Vec3f worldNormal = Vec3f(0, 1, 0);
 		Vec4f clipPlane = Vec4f(0, 1, 0, -planePosition.y);
 		Vec4f cameraPos = Vec4f(baseCamera->GetPosition());
+
+		Vec3f tangent = Vec3f(1, 0, 0);
+		
 		if (cameraPos.Dot(clipPlane) < 0) {
 			worldNormal *= -1;
+			tangent *= -1;
 		}
 
 		planeProgram->Bind();
@@ -779,10 +795,13 @@ void GlutDisplay() {
 		planeProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
 		planeProgram->SetUniform3("cameraPosition", 1, baseCamera->GetPosition().Elements());
 		planeProgram->SetUniform3("worldNormal", 1, worldNormal.Elements());
+		planeProgram->SetUniform3("tangent", 1, tangent.Elements());
 		planeProgram->SetUniform1("far_plane", 1, &depthFar);
 
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubemap);
+		glActiveTexture(GL_TEXTURE5);
+		planeNormalTexture->Bind(5);
 
 		glBindVertexArray(TextureVertexArrayObjectID);
 		switch (renderMode)
@@ -1131,6 +1150,21 @@ void SendDataToOpenGL(char objName[]) {
 
 	// Plane data
 	{
+		{
+			Material::Texture normalTexData = Material::Texture("teapot_normal.png");
+			planeNormalTexture = new cyGLTexture2D();
+			planeNormalTexture->Initialize();
+			planeNormalTexture->SetFilteringMode(GL_LINEAR, GL_LINEAR);
+			planeNormalTexture->SetWrappingMode(GL_CLAMP, GL_CLAMP);
+			planeNormalTexture->SetMaxAnisotropy();
+			planeNormalTexture->SetImage(
+				GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE,
+				normalTexData.textureData.data(), normalTexData.width, normalTexData.height
+			);
+			planeNormalTexture->BuildMipmaps();
+			glBindTexture(GL_TEXTURE_2D, 0);
+		}
+
 		Plane plane;
 		glGenBuffers(1, &TexturePlaneVertexBufferID);
 		glBindBuffer(GL_ARRAY_BUFFER, TexturePlaneVertexBufferID);
@@ -1157,6 +1191,7 @@ void SendDataToOpenGL(char objName[]) {
 #ifdef enable_env_cube
 	envCubeMapTexture->Bind(2);
 #endif // enable_env_cube
+	planeNormalTexture->Bind(5);
 }
 //-------------------------------------------------------------------------------
 
@@ -1240,8 +1275,8 @@ void CompileTeapotSceneShaders() {
 		targetObjectProgram->SetUniform("brdfMode", 0);
 		targetObjectProgram->SetUniform("diffuseTexture", 0);
 		targetObjectProgram->SetUniform("specularTexture", 1);
-		targetObjectProgram->SetUniform("depthMap", 3);
 		targetObjectProgram->SetUniform("skybox", 2);
+		targetObjectProgram->SetUniform("depthMap", 3);
 	}
 
 	// reflective plane shader
@@ -1267,6 +1302,29 @@ void CompileTeapotSceneShaders() {
 		planeProgram->SetUniform("depthMap", 1);
 		planeProgram->SetUniform("skybox", 2);
 		planeProgram->SetUniform("renderTexture", 3);
+		planeProgram->SetUniform("normalMap", 5);
+	}
+
+	{
+		if (vertexShader == NULL) {
+			vertexShader = new GLSLShader();
+		}
+		if (fragmentShader == NULL) {
+			fragmentShader = new GLSLShader();
+		}
+		if (geometryShader == NULL) {
+			geometryShader = new GLSLShader();
+		}
+		if (!vertexShader->CompileFile(planeShowTriVertShaderPath, GL_VERTEX_SHADER)) {
+			return;
+		}
+		if (!fragmentShader->CompileFile(planeShowTriFragShaderPath, GL_FRAGMENT_SHADER)) {
+			return;
+		}
+		if (!geometryShader->CompileFile(planeShowTriGeomShaderPath, GL_GEOMETRY_SHADER)) {
+			return;
+		}
+
 	}
 
 	// depth cube shader
