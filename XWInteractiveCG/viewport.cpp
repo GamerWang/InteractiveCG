@@ -65,6 +65,8 @@ GLRenderTexture2D* reflectionFrameBuffer;
 GLSLShader* vertexShader;
 GLSLShader* fragmentShader;
 GLSLShader* geometryShader;
+GLSLShader* tessCtrlShader;
+GLSLShader* tessEvalShader;
 
 char targetVertShaderPath[30] = "Data\\SV_TargetObj.glsl";
 char targetFragShaderPath[30] = "Data\\SF_TargetObj.glsl";
@@ -96,6 +98,9 @@ GLSLProgram* planeProgram;
 char planeShowTriVertShaderPath[30] = "Data\\PlaneShowTri_VS.glsl";
 char planeShowTriGeomShaderPath[30] = "Data\\PlaneShowTri_GS.glsl";
 char planeShowTriFragShaderPath[30] = "Data\\PlaneShowTri_FS.glsl";
+char planeTessCtrlShaderPath[30] = "Data\\Plane_TC.glsl";
+char planeTessEvalShaderPath[30] = "Data\\Plane_TE.glsl";
+char planeBumpGeoShaderPath[30] = "Data\\Plane_GS.glsl";
 GLSLProgram* planeTriProgram;
 
 
@@ -137,6 +142,7 @@ char planeUniformNames[500] = {
 #ifdef plane_diffuse
 	" normalMap"
 	" depthMap"
+	" dispMap"
 	" far_plane"
 #endif // plane_diffuse
 };
@@ -198,6 +204,7 @@ Vec3f baseObjectCenter;
 Vec3f planePosition;
 Vec3f planeRotation;
 Vec3f planeScale;
+bool showTriangle;
 
 //-------------------------------------------------------------------------------
 
@@ -285,6 +292,7 @@ void ShowViewport(int argc, char* argv[]) {
 	planePosition = Vec3f(0, -12, 0);
 	planeScale = Vec3f(40);
 	planeRotation = Vec3f(-Pi<float>() / 2, 0, 0);
+	showTriangle = false;
 
 	bgColor = new Vec3f(0, 0, 0);
 
@@ -333,10 +341,14 @@ void ShowViewport(int argc, char* argv[]) {
 	glutMouseFunc(GlutMouseClick);
 	glutMotionFunc(GlutMouseDrag);
 	glClearColor(bgColor->x, bgColor->y, bgColor->z, 0);
-	
+
 	glewInit();
 	glEnable(GL_DEPTH_TEST);
 	//glEnable(GL_CULL_FACE);
+
+	glPatchParameteri(GL_PATCH_VERTICES, 4);
+	//glPatchParameteri(GL_PATCH_DEFAULT_OUTER_LEVEL, 16);
+	//glPatchParameteri(GL_PATCH_DEFAULT_INNER_LEVEL, 16);
 
 	// prepare data for opengl
 	if (argc <= 1) {
@@ -411,6 +423,9 @@ void ShowViewport(int argc, char* argv[]) {
 			
 			GLuint uniformBlockIndexPlaneVert = glGetUniformBlockIndex(planeProgram->GetID(), "Matrices");
 			glUniformBlockBinding(planeProgram->GetID(), uniformBlockIndexPlaneVert, 0);
+
+			GLuint uniformBlockIndexPlaneTriVert = glGetUniformBlockIndex(planeTriProgram->GetID(), "Matrices");
+			glUniformBlockBinding(planeTriProgram->GetID(), uniformBlockIndexPlaneTriVert, 0);
 
 			// now create the buffer
 			glGenBuffers(1, &UBOMatrices);
@@ -802,17 +817,23 @@ void GlutDisplay() {
 		glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubemap);
 		glActiveTexture(GL_TEXTURE5);
 		planeNormalTexture->Bind(5);
+		glActiveTexture(GL_TEXTURE6);
+		planeDisplacementTexture->Bind(6);
 
 		glBindVertexArray(TextureVertexArrayObjectID);
-		switch (renderMode)
-		{
-		case XW_RENDER_LINELOOP:
-			glDrawElements(GL_LINE_LOOP, 6, GL_UNSIGNED_INT, 0);
-			break;
-		case XW_RENDER_TRIANGLES:
-		default:
-			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-			break;
+		//glDrawElements(GL_PATCHES, 4, GL_UNSIGNED_INT, 0);
+		glDrawArrays(GL_PATCHES, 0, 4);
+
+		if (showTriangle) {
+			planeTriProgram->Bind();
+
+			glActiveTexture(GL_TEXTURE1);
+			planeDisplacementTexture->Bind(1);
+
+			planeTriProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
+			glBindVertexArray(TextureVertexArrayObjectID);
+			//glDrawElements(GL_PATCHES, 4, GL_UNSIGNED_INT, 0);		
+			glDrawArrays(GL_PATCHES, 0, 4);
 		}
 	}
 
@@ -852,6 +873,9 @@ void GlutKeyboard(unsigned char key, int x, int y) {
 	case 'p':
 	case 'P':
 		baseCamera->SwitchCameraType();
+		break;
+	case ' ':
+		showTriangle = !showTriangle;
 		break;
 	case 27:
 		exit(0);
@@ -1165,6 +1189,19 @@ void SendDataToOpenGL(char objName[]) {
 			glBindTexture(GL_TEXTURE_2D, 0);
 		}
 
+		{
+			Material::Texture dispTexData = Material::Texture("teapot_disp.png");
+			planeDisplacementTexture = new cyGLTexture2D();
+			planeDisplacementTexture->Initialize();
+			planeDisplacementTexture->SetFilteringMode(GL_LINEAR, GL_LINEAR);
+			planeDisplacementTexture->SetWrappingMode(GL_CLAMP, GL_CLAMP);
+			planeDisplacementTexture->SetMaxAnisotropy();
+			planeDisplacementTexture->SetImage(GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE,
+				dispTexData.textureData.data(), dispTexData.width, dispTexData.height);
+			planeDisplacementTexture->BuildMipmaps();
+			glBindTexture(GL_TEXTURE_2D, 0);
+		}
+
 		Plane plane;
 		glGenBuffers(1, &TexturePlaneVertexBufferID);
 		glBindBuffer(GL_ARRAY_BUFFER, TexturePlaneVertexBufferID);
@@ -1199,6 +1236,8 @@ void InstallTeapotSceneShaders() {
 	vertexShader = new GLSLShader();
 	fragmentShader = new GLSLShader();
 	geometryShader = new GLSLShader();
+	tessCtrlShader = new GLSLShader();
+	tessEvalShader = new GLSLShader();
 
 	targetObjectProgram = new GLSLProgram();
 
@@ -1207,6 +1246,8 @@ void InstallTeapotSceneShaders() {
 #endif // enable_env_cube
 
 	planeProgram = new GLSLProgram();
+
+	planeTriProgram = new GLSLProgram();
 
 	pointLightDepthProgram = new GLSLProgram();
 
@@ -1279,6 +1320,8 @@ void CompileTeapotSceneShaders() {
 		targetObjectProgram->SetUniform("depthMap", 3);
 	}
 
+
+
 	// reflective plane shader
 	{
 		if (vertexShader == NULL) {
@@ -1293,16 +1336,30 @@ void CompileTeapotSceneShaders() {
 		if (!fragmentShader->CompileFile(planeFragShaderPath, GL_FRAGMENT_SHADER)) {
 			return;
 		}
+		if (!geometryShader->CompileFile(planeBumpGeoShaderPath, GL_GEOMETRY_SHADER)) {
+			return;
+		}
+		if (!tessCtrlShader->CompileFile(planeTessCtrlShaderPath, GL_TESS_CONTROL_SHADER)) {
+			return;
+		}
+		if (!tessEvalShader->CompileFile(planeTessEvalShaderPath, GL_TESS_EVALUATION_SHADER)) {
+			return;
+		}
+
 
 		planeProgram->CreateProgram();
 		planeProgram->AttachShader(vertexShader->GetID());
 		planeProgram->AttachShader(fragmentShader->GetID());
+		planeProgram->AttachShader(tessCtrlShader->GetID());
+		planeProgram->AttachShader(tessEvalShader->GetID());
+		planeProgram->AttachShader(geometryShader->GetID());
 		planeProgram->Link();
 		planeProgram->SetUniform("diffuseTexture", 0);
 		planeProgram->SetUniform("depthMap", 1);
 		planeProgram->SetUniform("skybox", 2);
 		planeProgram->SetUniform("renderTexture", 3);
 		planeProgram->SetUniform("normalMap", 5);
+		planeProgram->SetUniform("dispMap", 6);
 	}
 
 	{
@@ -1315,7 +1372,13 @@ void CompileTeapotSceneShaders() {
 		if (geometryShader == NULL) {
 			geometryShader = new GLSLShader();
 		}
-		if (!vertexShader->CompileFile(planeShowTriVertShaderPath, GL_VERTEX_SHADER)) {
+		if (tessCtrlShader == NULL) {
+			tessCtrlShader = new GLSLShader();
+		}
+		if (tessEvalShader == NULL) {
+			tessEvalShader = new GLSLShader();
+		}
+		if (!vertexShader->CompileFile(planeVertShaderPath, GL_VERTEX_SHADER)) {
 			return;
 		}
 		if (!fragmentShader->CompileFile(planeShowTriFragShaderPath, GL_FRAGMENT_SHADER)) {
@@ -1324,7 +1387,21 @@ void CompileTeapotSceneShaders() {
 		if (!geometryShader->CompileFile(planeShowTriGeomShaderPath, GL_GEOMETRY_SHADER)) {
 			return;
 		}
+		if (!tessCtrlShader->CompileFile(planeTessCtrlShaderPath, GL_TESS_CONTROL_SHADER)) {
+			return;
+		}
+		if (!tessEvalShader->CompileFile(planeTessEvalShaderPath, GL_TESS_EVALUATION_SHADER)) {
+			return;
+		}
 
+		planeTriProgram->CreateProgram();
+		planeTriProgram->AttachShader(vertexShader->GetID());
+		planeTriProgram->AttachShader(geometryShader->GetID());
+		planeTriProgram->AttachShader(fragmentShader->GetID());
+		planeTriProgram->AttachShader(tessCtrlShader->GetID());
+		planeTriProgram->AttachShader(tessEvalShader->GetID());
+		planeTriProgram->Link();
+		planeTriProgram->SetUniform("dispMap", 1);
 	}
 
 	// depth cube shader

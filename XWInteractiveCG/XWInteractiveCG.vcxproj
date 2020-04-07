@@ -28,7 +28,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
@@ -157,6 +157,9 @@ xcopy /E $(SolutionDir)$(ProjectName)\Data $(targetDir)Data\ /Y</Command>
     <None Include="Data\PlaneShowTri_FS.glsl" />
     <None Include="Data\PlaneShowTri_GS.glsl" />
     <None Include="Data\PlaneShowTri_VS.glsl" />
+    <None Include="Data\Plane_GS.glsl" />
+    <None Include="Data\Plane_TC.glsl" />
+    <None Include="Data\Plane_TE.glsl" />
     <None Include="Data\PointLightObject_FS.glsl" />
     <None Include="Data\PointLightObject_VS.glsl" />
     <None Include="Data\PointShadowDepth_FS.glsl" />

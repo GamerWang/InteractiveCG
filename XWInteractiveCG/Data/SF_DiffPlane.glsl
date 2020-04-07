@@ -1,4 +1,4 @@
-#version 330 core
+#version 430 core
 
 layout (location = 0) out vec4 daColor;
 
@@ -87,6 +87,7 @@ void main(){
 		(diffuse + specular) * (1.-shadow) + ambient,
 		1
 	);
+
 
 //	daColor = vec4(nml, 1);
 //	daColor = vec4(textureNormal, 1);

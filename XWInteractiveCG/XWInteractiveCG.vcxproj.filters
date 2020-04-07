@@ -95,6 +95,15 @@
     <None Include="Data\PlaneShowTri_FS.glsl">
       <Filter>Source Files\Data\Shaders</Filter>
     </None>
+    <None Include="Data\Plane_TC.glsl">
+      <Filter>Source Files\Data\Shaders</Filter>
+    </None>
+    <None Include="Data\Plane_TE.glsl">
+      <Filter>Source Files\Data\Shaders</Filter>
+    </None>
+    <None Include="Data\Plane_GS.glsl">
+      <Filter>Source Files\Data\Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Programs\cyCore.h">
