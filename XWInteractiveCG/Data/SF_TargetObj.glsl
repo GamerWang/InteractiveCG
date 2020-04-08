@@ -55,11 +55,13 @@ void main(){
 	viewTerm = ceil(viewTerm);
 	viewTerm = clamp(viewTerm, 0, 1);
 
+	float shadow = ShadowCalculation(worldPosition);
+
 	// handling pointLight0
 	// diffuse part
 	vec3 diffuse = vec3(0);
 	float pointLight0geoTerm = dot(worldNml, pointLight0Dir);
-	pointLight0geoTerm = clamp(pointLight0geoTerm, 0, 1);
+	//pointLight0geoTerm = clamp(pointLight0geoTerm, 0, 1);
 	diffuse += pointLight0geoTerm * pointLight0Intensity;
 
 	// specular part
@@ -67,18 +69,39 @@ void main(){
 	float specularTerm = dot(worldNml, pointLight0HalfDir);
 	specularTerm = clamp(specularTerm, 0, 1);
 	specularTerm = pow(specularTerm, glossiness);
+
+	float specLimit = .1f;
+	if(specularTerm > 1 - specLimit){
+		specularTerm = 1.f;
+	}else{
+		specularTerm = 0.f;
+	}
+
 	specular += specularTerm * pointLight0Intensity;
 
 	vec3 ambient = ambientLight;
 
-	float shadow = ShadowCalculation(worldPosition);
+	//diffuse *= (1.-shadow);
+	specular *= (1.-shadow);
+
+	if(diffuse.r > -.13f){
+		diffuse = vec3(1.f);
+	}else if(diffuse.r > -.24f){
+		diffuse = vec3(.4f);
+	}
+	else{
+		diffuse = vec3(.34f);
+	}
+
 	
 	if(brdfMode == 0){
 		// sample diffuse texture color
-		vec4 diffuseTextureColor = texture(diffuseTexture, texcoord);
-		vec4 specularTextureColor = texture(specularTexture, texcoord);
-		diffuse *= vec3(diffuseTextureColor * (1.-shadow));
-		specular *= vec3(specularTextureColor * (1.-shadow));
+		// vec4 diffuseTextureColor = texture(diffuseTexture, texcoord);
+		vec4 diffuseTextureColor = vec4(1., .1, .051, 1.);
+		// vec4 specularTextureColor = texture(specularTexture, texcoord);
+		vec4 specularTextureColor = vec4(1);
+		diffuse *= vec3(diffuseTextureColor);
+		specular *= vec3(specularTextureColor);
 		ambient *= vec3(diffuseTextureColor);
 		daColor = vec4(viewTerm*(diffuse + specular) + ambient, 1.0);
 	}else if(brdfMode == 1){
