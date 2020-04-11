@@ -121,5 +121,11 @@
     <ClInclude Include="Programs\xwMaterial.h">
       <Filter>Source Files\Programs\xwClasses</Filter>
     </ClInclude>
+    <ClInclude Include="Programs\xwModel.h">
+      <Filter>Source Files\Programs\xwClasses</Filter>
+    </ClInclude>
+    <ClInclude Include="Programs\xwMesh.h">
+      <Filter>Source Files\Programs\xwClasses</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

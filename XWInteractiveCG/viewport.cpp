@@ -13,6 +13,13 @@
 #include <time.h>
 #include <string.h>
 #include <vector>
+#include <filesystem>
+
+//-------------------------------------------------------------------------------
+
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
 
 //-------------------------------------------------------------------------------
 
@@ -42,6 +49,7 @@ using namespace cy;
 #include "xwLights.h";
 #include "xwMaterial.h";
 #include "xwHelper.h";
+#include "xwModel.h";
 
 //-------------------------------------------------------------------------------
 
@@ -92,6 +100,10 @@ char planeVertShaderPath[30] = "Data\\SV_DiffPlane.glsl";
 char planeFragShaderPath[30] = "Data\\SF_DiffPlane.glsl";
 #endif // plane_diffuse
 GLSLProgram* planeProgram;
+
+//-------------------------------------------------------------------------------
+
+Model* mainModel;
 
 //-------------------------------------------------------------------------------
 
@@ -256,9 +268,9 @@ bool IsMouseDown() { return !(mouseStates[0] * mouseStates[1] * mouseStates[2]);
 
 void ShowViewport(int argc, char* argv[]) {
 	// initialize scene data
-	baseObjectPosition = Vec3f(0, -4, 0);
+	baseObjectPosition = Vec3f(0, -10, 0);
 	baseObjectRotation = Vec3f(0, 0, 0);
-	baseObjectScale = Vec3f(1.0f, 1.0f, 1.0f);
+	baseObjectScale = Vec3f(.5f, .5f, .5f);
 
 	baseObjectMaterial = new Material();
 	baseObjectGlossiness = 20;
@@ -379,6 +391,10 @@ void ShowViewport(int argc, char* argv[]) {
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
+	// read model
+	//mainModel = new Model("Data/MagikarpM.fbx");
+	mainModel = new Model("Data/Fuka_my.fbx");
+
 	// install shaders to opengl
 	InstallTeapotSceneShaders();
 	//InstallRTPlaneSceneShaders();
@@ -439,7 +455,7 @@ void GlutDisplay() {
 		glViewport(0, 0, screenSize[0], screenSize[1]);
 		reflectionFrameBuffer->Bind();
 
-		glClearColor(0, 0, 0, 1.0f);
+		glClearColor(.101f, .0625f, .125f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		Camera reflectionCam = Camera(baseCamera);
@@ -583,8 +599,7 @@ void GlutDisplay() {
 
 					pointLightDepthProgram->SetUniformMatrix4("model", &objectToWorldMatrix.cell[0]);
 
-					glBindVertexArray(baseVertexArrayObjectID);
-					glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
+					mainModel->Draw(pointLightDepthProgram);
 				}
 
 				// render plane
@@ -707,17 +722,7 @@ void GlutDisplay() {
 		glActiveTexture(GL_TEXTURE3);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubemap);
 
-		glBindVertexArray(baseVertexArrayObjectID);
-		switch (renderMode)
-		{
-		case XW_RENDER_LINELOOP:
-			glDrawElements(GL_LINE_LOOP, baseNumIndices, GL_UNSIGNED_INT, 0);
-			break;
-		case XW_RENDER_TRIANGLES:
-		default:
-			glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
-			break;
-		}
+		mainModel->Draw(targetObjectProgram);
 	}
 
 	// render light object temp
@@ -953,7 +958,7 @@ void SendDataToOpenGL(char objName[]) {
 	char objPath[50] = "Data\\";
 	strcat(objPath, objName);
 	
-	// read teapot data
+	// read target data using cyTriMesh
 	targetObject = new cyTriMesh();
 	if (targetObject->LoadFromFileObj(objPath, true)) {
 		// process vertex data
@@ -999,8 +1004,11 @@ void SendDataToOpenGL(char objName[]) {
 			delete[] objIndices;
 		}
 
+		// read target data using AssImp
+
+
 		// process target material data
-		{
+		/*{
 			if (targetObject->NM() > 0) {
 				cyTriMesh::Mtl* material = &targetObject->M(0);
 				baseObjectMaterial->Initialize(material);
@@ -1033,6 +1041,32 @@ void SendDataToOpenGL(char objName[]) {
 				baseObjectSpecular->BuildMipmaps();
 				glBindTexture(GL_TEXTURE_2D, 0);
 			}
+		}*/
+
+		// hard coded texture load
+		{
+			Material::Texture diffuseTexture = Material::Texture("brick.png");
+			baseObjectDiffuse = new cyGLTexture2D();
+			baseObjectDiffuse->Initialize();
+			baseObjectDiffuse->SetFilteringMode(GL_LINEAR, GL_LINEAR);
+			baseObjectDiffuse->SetWrappingMode(GL_REPEAT, GL_REPEAT);
+			baseObjectDiffuse->SetMaxAnisotropy();
+			baseObjectDiffuse->SetImage(
+				GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE,
+				diffuseTexture.textureData.data(), diffuseTexture.width, diffuseTexture.height);
+			baseObjectDiffuse->BuildMipmaps();
+
+			Material::Texture specularTexture = Material::Texture("brick-specular.png");
+			baseObjectSpecular = new cyGLTexture2D();
+			baseObjectSpecular->Initialize();
+			baseObjectSpecular->SetFilteringMode(GL_LINEAR, GL_LINEAR);
+			baseObjectSpecular->SetWrappingMode(GL_REPEAT, GL_REPEAT);
+			baseObjectSpecular->SetMaxAnisotropy();
+			baseObjectSpecular->SetImage(
+				GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE,
+				specularTexture.textureData.data(), specularTexture.width, specularTexture.height);
+			baseObjectSpecular->BuildMipmaps();
+			glBindTexture(GL_TEXTURE_2D, 0);
 		}
 		
 		// setup vertex arrays
