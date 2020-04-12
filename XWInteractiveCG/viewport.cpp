@@ -337,7 +337,7 @@ void ShowViewport(int argc, char* argv[]) {
 	planeSceneCamera->SetPosition(Vec3f(0, 0, 3));
 
 	ambientLight.SetIntensity(.15f);
-	pointLight0.SetPosition(Vec3f(0, 0, 40));
+	pointLight0.SetPosition(Vec3f(0, 0, 80));
 	pointLight0.SetIntensity(Vec3f(.7f));
 	pointLight0.SetRotation(Vec2f(Pi<float>() * (-40.f/180.f), Pi<float>() * (35.f / 180.f)));
 

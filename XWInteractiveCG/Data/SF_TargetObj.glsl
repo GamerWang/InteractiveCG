@@ -68,7 +68,7 @@ void main(){
 	float finalDark = (1.-shadow) * yin;
 
 	vec3 brightColor = vec3(1, 1, 1);
-	vec3 darkColor = vec3(.4, .2, .2);
+	vec3 darkColor = vec3(.6, .3, .3);
 
 	vec3 finalTint = mix(darkColor, brightColor, yin);
 
@@ -103,9 +103,11 @@ void main(){
 	vec4 diffuseTextureColor = texture(diffuseTexture, texcoord);
 	float matcapMask = texture(matcapMask, texcoord).r;
 	vec4 matcapColor = texture(matcapTexture, matcapTexcoord);
-	matcapColor = mix(vec4(1), matcapColor, matcapMask);
+	matcapColor = mix(vec4(1), matcapColor * 1.8, matcapMask*.5);
+
 	// vec4 specularTextureColor = texture(specularTexture, texcoord);
 	vec4 specularTextureColor = vec4(1);
+
 	diffuse = vec3(diffuseTextureColor * matcapColor);
 	specular *= vec3(specularTextureColor);
 
