@@ -29,6 +29,12 @@ using namespace cy;
 
 //-------------------------------------------------------------------------------
 
+//#define MODEL_USE_FUKA 0
+
+#define MODEL_USE_MAGI 0
+
+//-------------------------------------------------------------------------------
+
 class Model {
 public:
 	/* Model Data */
@@ -150,6 +156,60 @@ private:
 			aiString str;
 			mat->GetTexture(type, i, &str);
 			string textureName = string(str.C_Str());
+
+#ifdef MODEL_USE_MAGI
+			string body = "Body";
+			string eye = "Eye";
+
+			size_t fFound = textureName.find(body);
+			size_t eFound = textureName.find(eye);
+
+			// Magikarp texture read
+			{
+				string matCapDir = "MagiTex\\Magi_Body_Matcap.png";
+
+				if (textureName.find(body) != string::npos) {
+					Texture diffuseMap, matCap, matCapMask;
+					string diffuseDir = "MagiTex\\Magi_Body_Diffuse.png";
+					diffuseMap.id = TextureFromFile(diffuseDir);
+					diffuseMap.path = diffuseDir;
+					diffuseMap.type = typeName;
+					textures.push_back(diffuseMap);
+
+					matCap.id = TextureFromFile(matCapDir);
+					matCap.path = matCapDir;
+					matCap.type = typeName;
+					textures.push_back(matCap);
+
+					string matMaskDir = "MagiTex\\Magi_Body_Matcap_Mask.png";
+					matCapMask.id = TextureFromFile(matMaskDir);
+					matCapMask.path = matMaskDir;
+					matCapMask.type = typeName;
+					textures.push_back(matCapMask);
+
+				}else if (textureName.find(eye) != string::npos) {
+					Texture diffuseMap, matCap, matCapMask;
+					string diffuseDir = "MagiTex\\Magi_Eye_Diffuse.png";
+					diffuseMap.id = TextureFromFile(diffuseDir);
+					diffuseMap.path = diffuseDir;
+					diffuseMap.type = typeName;
+					textures.push_back(diffuseMap);
+
+					matCap.id = TextureFromFile(matCapDir);
+					matCap.path = matCapDir;
+					matCap.type = typeName;
+					textures.push_back(matCap);
+
+					string matMaskDir = "MagiTex\\Magi_Eye_Matcap_Mask.png";
+					matCapMask.id = TextureFromFile(matMaskDir);
+					matCapMask.path = matMaskDir;
+					matCapMask.type = typeName;
+					textures.push_back(matCapMask);
+				}
+			}
+#endif
+
+#ifdef MODEL_USE_FUKA
 			string face = "Face";
 			string body = "Body";
 			string hair = "Hair";
@@ -158,30 +218,36 @@ private:
 			size_t bFound = textureName.find(body);
 			size_t hFound = textureName.find(hair);
 
-			if (textureName.find(face) != string::npos) {
-				Texture diffuseMap, lightMap;
-				string diffuseDir =  "FukaTex\\Fuka_Face_BaseColor.png";
-				diffuseMap.id = TextureFromFile(diffuseDir);
-				diffuseMap.path = diffuseDir;
-				diffuseMap.type = typeName;
-				textures.push_back(diffuseMap);
+			cout << str.C_Str() << endl;
+
+			// Fuka texture read
+			{
+				if (textureName.find(face) != string::npos) {
+					Texture diffuseMap, lightMap;
+					string diffuseDir =  "FukaTex\\Fuka_Face_BaseColor.png";
+					diffuseMap.id = TextureFromFile(diffuseDir);
+					diffuseMap.path = diffuseDir;
+					diffuseMap.type = typeName;
+					textures.push_back(diffuseMap);
+				}
+				else if (textureName.find(body) != string::npos) {
+					Texture diffuseMap, lightMap;
+					string diffuseDir = "FukaTex\\Fuka_Body_BaseColor.png";
+					diffuseMap.id = TextureFromFile(diffuseDir);
+					diffuseMap.path = diffuseDir;
+					diffuseMap.type = typeName;
+					textures.push_back(diffuseMap);
+				}
+				else if (textureName.find(hair) != string::npos) {
+					Texture diffuseMap, lightMap;
+					string diffuseDir = "FukaTex\\Fuka_Hair_BaseColor.png";
+					diffuseMap.id = TextureFromFile(diffuseDir);
+					diffuseMap.path = diffuseDir;
+					diffuseMap.type = typeName;
+					textures.push_back(diffuseMap);
+				}
 			}
-			else if (textureName.find(body) != string::npos) {
-				Texture diffuseMap, lightMap;
-				string diffuseDir = "FukaTex\\Fuka_Body_BaseColor.png";
-				diffuseMap.id = TextureFromFile(diffuseDir);
-				diffuseMap.path = diffuseDir;
-				diffuseMap.type = typeName;
-				textures.push_back(diffuseMap);
-			}
-			else if (textureName.find(hair) != string::npos) {
-				Texture diffuseMap, lightMap;
-				string diffuseDir = "FukaTex\\Fuka_Hair_BaseColor.png";
-				diffuseMap.id = TextureFromFile(diffuseDir);
-				diffuseMap.path = diffuseDir;
-				diffuseMap.type = typeName;
-				textures.push_back(diffuseMap);
-			}
+#endif 
 		}
 		return textures;
 	}
@@ -206,6 +272,8 @@ private:
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+		glBindTexture(GL_TEXTURE_2D, 0);
 
 		return textureID;
 	}

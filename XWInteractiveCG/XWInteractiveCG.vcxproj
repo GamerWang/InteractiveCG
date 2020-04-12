@@ -173,6 +173,10 @@ xcopy $(SolutionDir)MiddleWare\Assimp\bin\Release\Win32\assimp-vc141-mt.dll $(ta
     <None Include="Data\SV_DiffPlane.glsl" />
     <None Include="Data\SV_RefPlane.glsl" />
     <None Include="Data\SV_TargetObj.glsl" />
+    <None Include="Data\TargetObjOutline_FS.glsl" />
+    <None Include="Data\TargetObjOutline_GS.glsl" />
+    <None Include="Data\TargetObjOutline_VS.glsl" />
+    <None Include="Data\TargetObj_VS.glsl" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Programs\cyCore.h" />

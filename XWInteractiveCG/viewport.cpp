@@ -78,6 +78,11 @@ char targetVertShaderPath[30] = "Data\\SV_TargetObj.glsl";
 char targetFragShaderPath[30] = "Data\\SF_TargetObj.glsl";
 GLSLProgram* targetObjectProgram;
 
+char targetOutlineVertShaderPath[30] = "Data\\TargetObjOutline_VS.glsl";
+char targetOutlineGeomShaderPath[30] = "Data\\TargetObjOutline_GS.glsl";
+char targetOutlineFragShaderPath[30] = "Data\\TargetObjOutline_FS.glsl";
+GLSLProgram* targetOutlineProgram;
+
 char RTextureVertShaderPath[30] = "Data\\SV_RTPlane.glsl";
 char RTextureFragShaderPath[30] = "Data\\SF_RTPlane.glsl";
 GLSLProgram* RTextureProgram;
@@ -111,13 +116,13 @@ char targetUniformNames[500] = {
 	"objectToWorldMatrix"
 	" objectNormalToWorldMatrix"
 	" glossiness"
-	//" diffuseColor"
-	//" specularColor"
 	" cameraPosition"
 	" clipPlane"
 	" brdfMode"
 	" diffuseTexture"
 	" specularTexture"
+	" matcapTexture"
+	" matcapMask"
 	" skybox"
 	" depthMap"
 	" far_plane"
@@ -285,7 +290,7 @@ void ShowViewport(int argc, char* argv[]) {
 	// Magikarp settings
 	{
 		baseObjectPosition = Vec3f(0, -23, 0);
-		baseObjectRotation = Vec3f(0, 0, 0);
+		baseObjectRotation = Vec3f(0, -Pi<float>() / 3, 0);
 		baseObjectScale = Vec3f(.6f, .6f, .6f);
 
 		planePosition = Vec3f(0, -25, 0);
@@ -334,7 +339,7 @@ void ShowViewport(int argc, char* argv[]) {
 	ambientLight.SetIntensity(.15f);
 	pointLight0.SetPosition(Vec3f(0, 0, 40));
 	pointLight0.SetIntensity(Vec3f(.7f));
-	pointLight0.SetRotation(Vec2f(-Pi<float>() / 3, Pi<float>() / 3));
+	pointLight0.SetRotation(Vec2f(Pi<float>() * (-40.f/180.f), Pi<float>() * (35.f / 180.f)));
 
 	renderMode = XW_RENDER_TRIANGLES;
 
@@ -356,7 +361,7 @@ void ShowViewport(int argc, char* argv[]) {
 	
 	glewInit();
 	glEnable(GL_DEPTH_TEST);
-	//glEnable(GL_CULL_FACE);
+	glEnable(GL_CULL_FACE);
 
 	// prepare data for opengl
 	if (argc <= 1) {
@@ -475,7 +480,7 @@ void GlutDisplay() {
 		glViewport(0, 0, screenSize[0], screenSize[1]);
 		reflectionFrameBuffer->Bind();
 
-		glClearColor(.101f, .0625f, .125f, 1.0f);
+		glClearColor(0, 0, 0, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		Camera reflectionCam = Camera(baseCamera);
@@ -487,8 +492,8 @@ void GlutDisplay() {
 				reflectionCam.WorldToViewMatrix();
 
 			Matrix4f worldToClampMatrix = worldToViewMatrix;
+			Matrix4f viewToProjectionMatrix = reflectionCam.ViewToProjectionMatrix();
 			if (reflectionCam.GetCameraType() == CameraType::XW_CAMERA_PERSPECTIVE) {
-				Matrix4f viewToProjectionMatrix = reflectionCam.ViewToProjectionMatrix();
 				worldToClampMatrix = viewToProjectionMatrix * worldToClampMatrix;
 			}
 			else if (reflectionCam.GetCameraType() == CameraType::XW_CAMERA_ORTHOGONAL) {
@@ -644,7 +649,9 @@ void GlutDisplay() {
 	glViewport(0, 0, screenSize[0], screenSize[1]);
 	glDepthMask(GL_TRUE);
 	glEnable(GL_DEPTH_TEST);
-	glClearColor(0, 0, 0, 1.0f);
+	//glClearColor(0, 0, 0, 1.0f);
+	glClearColor(.071f, .0625f, .165f, 1.0f);
+	//glClearColor(0.1796875, 0.8125, 1.f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
 	// send worldToClamp to uniform buffer object
@@ -668,6 +675,10 @@ void GlutDisplay() {
 		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(Matrix4f), sizeof(Matrix4f), &worldToViewMatrix.cell[0]);
 		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(Matrix4f) * 2, sizeof(Matrix4f), &viewToProjectionMatrix.cell[0]);
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+		// send outline shader matrices
+		targetOutlineProgram->SetUniformMatrix4("worldToView", &worldToViewMatrix.cell[0]);
+		targetOutlineProgram->SetUniformMatrix4("viewToClip", &viewToProjectionMatrix.cell[0]);
 	}
 
 	// send point light info to uniform buffer object
@@ -707,12 +718,55 @@ void GlutDisplay() {
 	}
 #endif // enable_environment_cube
 
+	// render plane object
+	{
+		Matrix4f objectToWorldMatrix =
+			Matrix4f::Translation(planePosition) *
+			Matrix4f::Scale(planeScale) *
+			Matrix4f::RotationXYZ(planeRotation.x, planeRotation.y, planeRotation.z);
+
+		Vec3f worldNormal = Vec3f(0, 1, 0);
+		Vec4f clipPlane = Vec4f(0, 1, 0, -planePosition.y);
+		Vec4f cameraPos = Vec4f(baseCamera->GetPosition());
+		if (cameraPos.Dot(clipPlane) < 0) {
+			worldNormal *= -1;
+		}
+
+		planeProgram->Bind();
+		reflectionFrameBuffer->BindTexture(3);
+
+		planeProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
+		planeProgram->SetUniform3("cameraPosition", 1, baseCamera->GetPosition().Elements());
+		planeProgram->SetUniform3("worldNormal", 1, worldNormal.Elements());
+		planeProgram->SetUniform1("far_plane", 1, &depthFar);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, baseObjectDiffuse->GetID());
+
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubemap);
+
+		glBindVertexArray(TextureVertexArrayObjectID);
+		switch (renderMode)
+		{
+		case XW_RENDER_LINELOOP:
+			glDrawElements(GL_LINE_LOOP, 6, GL_UNSIGNED_INT, 0);
+			break;
+		case XW_RENDER_TRIANGLES:
+		default:
+			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+			break;
+		}
+	}
 
 	// render target object
 	// compute matrices here
 	{
 		glDepthMask(GL_TRUE);
 		glDisable(GL_CLIP_DISTANCE0);
+
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_BACK);
 
 		// send uniforms here
 		Matrix4f objectToWorldMatrix =
@@ -743,6 +797,17 @@ void GlutDisplay() {
 		glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubemap);
 
 		mainModel->Draw(targetObjectProgram);
+		
+		// Draw outlines
+		targetOutlineProgram->Bind();
+		
+		targetOutlineProgram->SetUniformMatrix4("objectToWorld", &objectToWorldMatrix.cell[0]);
+		targetOutlineProgram->SetUniformMatrix3("objNmlToWorld", &objectNormalToWorldMatrix.cell[0]);
+
+		glCullFace(GL_FRONT);
+		mainModel->Draw(targetOutlineProgram);
+
+		glCullFace(GL_BACK);
 	}
 
 	// render light object temp
@@ -784,43 +849,6 @@ void GlutDisplay() {
 		}
 	}
 
-	// render plane object
-	{
-		Matrix4f objectToWorldMatrix = 
-			Matrix4f::Translation(planePosition) *
-			Matrix4f::Scale(planeScale) *
-			Matrix4f::RotationXYZ(planeRotation.x, planeRotation.y, planeRotation.z);
-
-		Vec3f worldNormal = Vec3f(0, 1, 0);
-		Vec4f clipPlane = Vec4f(0, 1, 0, -planePosition.y);
-		Vec4f cameraPos = Vec4f(baseCamera->GetPosition());
-		if (cameraPos.Dot(clipPlane) < 0) {
-			worldNormal *= -1;
-		}
-
-		planeProgram->Bind();
-		reflectionFrameBuffer->BindTexture(3);
-
-		planeProgram->SetUniformMatrix4("objectToWorldMatrix", &objectToWorldMatrix.cell[0]);
-		planeProgram->SetUniform3("cameraPosition", 1, baseCamera->GetPosition().Elements());
-		planeProgram->SetUniform3("worldNormal", 1, worldNormal.Elements());
-		planeProgram->SetUniform1("far_plane", 1, &depthFar);
-
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubemap);
-
-		glBindVertexArray(TextureVertexArrayObjectID);
-		switch (renderMode)
-		{
-		case XW_RENDER_LINELOOP:
-			glDrawElements(GL_LINE_LOOP, 6, GL_UNSIGNED_INT, 0);
-			break;
-		case XW_RENDER_TRIANGLES:
-		default:
-			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-			break;
-		}
-	}
 
 
 	glutSwapBuffers();
@@ -1065,7 +1093,7 @@ void SendDataToOpenGL(char objName[]) {
 
 		// hard coded texture load
 		{
-			Material::Texture diffuseTexture = Material::Texture("brick.png");
+			Material::Texture diffuseTexture = Material::Texture("toonWater.png");
 			baseObjectDiffuse = new cyGLTexture2D();
 			baseObjectDiffuse->Initialize();
 			baseObjectDiffuse->SetFilteringMode(GL_LINEAR, GL_LINEAR);
@@ -1075,6 +1103,7 @@ void SendDataToOpenGL(char objName[]) {
 				GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE,
 				diffuseTexture.textureData.data(), diffuseTexture.width, diffuseTexture.height);
 			baseObjectDiffuse->BuildMipmaps();
+
 
 			Material::Texture specularTexture = Material::Texture("brick-specular.png");
 			baseObjectSpecular = new cyGLTexture2D();
@@ -1086,6 +1115,7 @@ void SendDataToOpenGL(char objName[]) {
 				GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE,
 				specularTexture.textureData.data(), specularTexture.width, specularTexture.height);
 			baseObjectSpecular->BuildMipmaps();
+
 			glBindTexture(GL_TEXTURE_2D, 0);
 		}
 		
@@ -1221,6 +1251,8 @@ void InstallTeapotSceneShaders() {
 
 	targetObjectProgram = new GLSLProgram();
 
+	targetOutlineProgram = new GLSLProgram();
+
 #ifdef enable_env_cube
 	cubemapProgram = new GLSLProgram();
 #endif // enable_env_cube
@@ -1292,10 +1324,37 @@ void CompileTeapotSceneShaders() {
 		targetObjectProgram->Link();
 
 		targetObjectProgram->SetUniform("brdfMode", 0);
-		targetObjectProgram->SetUniform("diffuseTexture", 0);
 		targetObjectProgram->SetUniform("specularTexture", 1);
 		targetObjectProgram->SetUniform("depthMap", 3);
 		targetObjectProgram->SetUniform("skybox", 2);
+	}
+
+	// target outline shaders
+	{
+		if (vertexShader == NULL) {
+			vertexShader = new GLSLShader();
+		}
+		if (geometryShader == NULL) {
+			geometryShader = new GLSLShader();
+		}
+		if (fragmentShader == NULL) {
+			fragmentShader = new GLSLShader();
+		}
+		if (!vertexShader->CompileFile(targetOutlineVertShaderPath, GL_VERTEX_SHADER)) {
+			return;
+		}
+		if (!fragmentShader->CompileFile(targetOutlineFragShaderPath, GL_FRAGMENT_SHADER)) {
+			return;
+		}
+		if (!geometryShader->CompileFile(targetOutlineGeomShaderPath, GL_GEOMETRY_SHADER)) {
+			return;
+		}
+
+		targetOutlineProgram->CreateProgram();
+		targetOutlineProgram->AttachShader(vertexShader->GetID());
+		targetOutlineProgram->AttachShader(fragmentShader->GetID());
+		targetOutlineProgram->AttachShader(geometryShader->GetID());
+		targetOutlineProgram->Link();
 	}
 
 	// reflective plane shader

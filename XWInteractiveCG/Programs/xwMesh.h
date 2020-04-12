@@ -56,8 +56,16 @@ public:
 
 		if (textures.size() > 0) {
 			glActiveTexture(GL_TEXTURE0 + textures[0].id);
-			program->SetUniform("diffuseTexture", (int)textures[0].id);
 			glBindTexture(GL_TEXTURE_2D, textures[0].id);
+			program->SetUniform("diffuseTexture", (int)textures[0].id);
+
+			glActiveTexture(GL_TEXTURE0 + textures[1].id);
+			glBindTexture(GL_TEXTURE_2D, textures[1].id);
+			program->SetUniform("matcapTexture", (int)textures[1].id);
+
+			glActiveTexture(GL_TEXTURE0 + textures[2].id);
+			glBindTexture(GL_TEXTURE_2D, textures[2].id);
+			program->SetUniform("matcapMask", (int)textures[2].id);
 		}
 
 		// draw mesh

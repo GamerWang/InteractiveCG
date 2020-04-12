@@ -6,6 +6,7 @@ layout (location = 2) in vec2 texturecoord;
 
 out vec2 texcoord;
 out vec3 worldNormal;
+out vec4 viewNormal;
 out vec3 worldPosition;
 
 layout (std140) uniform Matrices{
@@ -26,7 +27,8 @@ void main(){
 
 	texcoord = vec2(texturecoord);
 
-	worldNormal = objectNormalToWorldMatrix * normal, 0.0;
+	worldNormal = objectNormalToWorldMatrix * normal;
+	viewNormal = worldToView * vec4(worldNormal, .0);
 
 	vec4 v = vec4(pos, 1.0);
 	v = objectToWorldMatrix * v;
