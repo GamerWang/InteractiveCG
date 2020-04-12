@@ -268,9 +268,29 @@ bool IsMouseDown() { return !(mouseStates[0] * mouseStates[1] * mouseStates[2]);
 
 void ShowViewport(int argc, char* argv[]) {
 	// initialize scene data
-	baseObjectPosition = Vec3f(0, -10, 0);
-	baseObjectRotation = Vec3f(0, 0, 0);
-	baseObjectScale = Vec3f(.5f, .5f, .5f);
+	{
+		baseCamera = new Camera();
+	}
+
+	// Fuka-settings
+	/*{
+		baseObjectPosition = Vec3f(0, -43, 0);
+		baseObjectRotation = Vec3f(Pi<float>() / 2, 0, 0);
+		baseObjectScale = Vec3f(.9f, .9f, .9f);
+
+		planePosition = Vec3f(0, -43, 0);
+		baseCamera->SetPosition(Vec3f(0, 0, 30));
+	}*/
+
+	// Magikarp settings
+	{
+		baseObjectPosition = Vec3f(0, -23, 0);
+		baseObjectRotation = Vec3f(0, 0, 0);
+		baseObjectScale = Vec3f(.6f, .6f, .6f);
+
+		planePosition = Vec3f(0, -25, 0);
+		baseCamera->SetPosition(Vec3f(0, 0, 100));
+	}
 
 	baseObjectMaterial = new Material();
 	baseObjectGlossiness = 20;
@@ -282,7 +302,7 @@ void ShowViewport(int argc, char* argv[]) {
 	// center cut position
 	//planePosition = Vec3f(0, -8, 0);
 	// below teapot position
-	planePosition = Vec3f(0, -12, 0);
+	//planePosition = Vec3f(0, -43, 0);
 	planeScale = Vec3f(280);
 	planeRotation = Vec3f(-Pi<float>() / 2, 0, 0);
 
@@ -303,9 +323,9 @@ void ShowViewport(int argc, char* argv[]) {
 	screenSize[0] = 800;
 	screenSize[1] = 800;
 
-	baseCamera = new Camera();
+	//baseCamera = new Camera();
 	baseCamera->SetAspect((float)screenSize[0] / (float)screenSize[1]);
-	baseCamera->SetPosition(Vec3f(0, 0, 100));
+	//baseCamera->SetPosition(Vec3f(0, 0, 30));
 
 	planeSceneCamera = new Camera();
 	planeSceneCamera->SetAspect((float)screenSize[0] / (float)screenSize[1]);
@@ -392,8 +412,8 @@ void ShowViewport(int argc, char* argv[]) {
 	}
 
 	// read model
-	//mainModel = new Model("Data/MagikarpM.fbx");
-	mainModel = new Model("Data/Fuka_my.fbx");
+	mainModel = new Model("Data/MagikarpM.fbx");
+	//mainModel = new Model("Data/Fuka_my.fbx");
 
 	// install shaders to opengl
 	InstallTeapotSceneShaders();

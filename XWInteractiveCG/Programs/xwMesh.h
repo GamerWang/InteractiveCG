@@ -54,6 +54,12 @@ public:
 	void Draw(GLSLProgram* program) {
 		// bind appropriate textures
 
+		if (textures.size() > 0) {
+			glActiveTexture(GL_TEXTURE0 + textures[0].id);
+			program->SetUniform("diffuseTexture", (int)textures[0].id);
+			glBindTexture(GL_TEXTURE_2D, textures[0].id);
+		}
+
 		// draw mesh
 		glBindVertexArray(VAO);
 		glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
@@ -91,15 +97,15 @@ private:
 		// vertex texture coords
 		glEnableVertexAttribArray(2);
 		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 
-			sizeof(xwVertex), (void*)0);
+			sizeof(xwVertex), (void*)offsetof(xwVertex, TexCoords));
 		// vertex tangent
 		glEnableVertexAttribArray(3);
 		glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 
-			sizeof(xwVertex), (void*)0);
+			sizeof(xwVertex), (void*)offsetof(xwVertex, Tangent));
 		// vertex bitangent
 		glEnableVertexAttribArray(4);
 		glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 
-			sizeof(xwVertex), (void*)0);
+			sizeof(xwVertex), (void*)offsetof(xwVertex, Bitangent));
 
 		glBindVertexArray(0);
 	}

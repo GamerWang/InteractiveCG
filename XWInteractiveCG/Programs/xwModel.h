@@ -25,6 +25,7 @@ using namespace cy;
 //-------------------------------------------------------------------------------
 
 #include "xwMesh.h";
+#include "xwMaterial.h";
 
 //-------------------------------------------------------------------------------
 
@@ -86,9 +87,8 @@ private:
 
 	Mesh processMesh(aiMesh *mesh, const aiScene *scene) {
 		// data to fill
-		vector<xwVertex>	vertices;
-		vector<GLuint>	indices;
-		vector<Texture> textures;
+		vector<xwVertex> vertices;
+		vector<GLuint>	 indices;
 
 		// walk through each vertices
 		for (GLuint i = 0; i < mesh->mNumVertices; i++) {
@@ -108,6 +108,9 @@ private:
 				vertex.TexCoords = Vec2f(
 					mesh->mTextureCoords[0][i].x,
 					mesh->mTextureCoords[0][i].y);
+				//cout << "current texcoord: "
+				//	<< vertex.TexCoords.x << ","
+				//	<< vertex.TexCoords.y << endl;
 			}
 			else
 				vertex.TexCoords = Vec2f(.0f, .0f);
@@ -133,12 +136,10 @@ private:
 		// process materials
 		aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
 
-		vector<Texture> diffuseMaps = 
-			loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse");
+		vector<Texture> maps = 
+			loadMaterialTextures(material, aiTextureType_DIFFUSE, "Fuka_Tex");
 
-		
-
-		return Mesh(vertices, indices, textures);
+		return Mesh(vertices, indices, maps);
 	}
 
 	// checks all material textures
@@ -148,10 +149,65 @@ private:
 		for (unsigned int i = 0; i < mat->GetTextureCount(type); i++) {
 			aiString str;
 			mat->GetTexture(type, i, &str);
-			cout << str.C_Str() << endl;
-			
+			string textureName = string(str.C_Str());
+			string face = "Face";
+			string body = "Body";
+			string hair = "Hair";
+
+			size_t fFound = textureName.find(face);
+			size_t bFound = textureName.find(body);
+			size_t hFound = textureName.find(hair);
+
+			if (textureName.find(face) != string::npos) {
+				Texture diffuseMap, lightMap;
+				string diffuseDir =  "FukaTex\\Fuka_Face_BaseColor.png";
+				diffuseMap.id = TextureFromFile(diffuseDir);
+				diffuseMap.path = diffuseDir;
+				diffuseMap.type = typeName;
+				textures.push_back(diffuseMap);
+			}
+			else if (textureName.find(body) != string::npos) {
+				Texture diffuseMap, lightMap;
+				string diffuseDir = "FukaTex\\Fuka_Body_BaseColor.png";
+				diffuseMap.id = TextureFromFile(diffuseDir);
+				diffuseMap.path = diffuseDir;
+				diffuseMap.type = typeName;
+				textures.push_back(diffuseMap);
+			}
+			else if (textureName.find(hair) != string::npos) {
+				Texture diffuseMap, lightMap;
+				string diffuseDir = "FukaTex\\Fuka_Hair_BaseColor.png";
+				diffuseMap.id = TextureFromFile(diffuseDir);
+				diffuseMap.path = diffuseDir;
+				diffuseMap.type = typeName;
+				textures.push_back(diffuseMap);
+			}
 		}
 		return textures;
+	}
+
+	GLuint TextureFromFile(const string &directory) {
+
+		GLuint textureID;
+		glGenTextures(1, &textureID);
+
+		int width, height;
+		Material::Texture currentTex = Material::Texture(directory.c_str());
+
+		width = currentTex.width;
+		height = currentTex.height;
+
+		glBindTexture(GL_TEXTURE_2D, textureID);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height,
+			0, GL_RGBA, GL_UNSIGNED_BYTE, currentTex.textureData.data());
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+		return textureID;
 	}
 };
 
