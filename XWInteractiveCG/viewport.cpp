@@ -901,11 +901,11 @@ void GlutDisplay() {
 		switch (renderMode)
 		{
 		case XW_RENDER_LINELOOP:
-			glDrawElements(GL_LINE_LOOP, baseNumIndices, GL_UNSIGNED_INT, 0);
+			//glDrawElements(GL_LINE_LOOP, baseNumIndices, GL_UNSIGNED_INT, 0);
 			break;
 		case XW_RENDER_TRIANGLES:
 		default:
-			glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
+			//glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
 			break;
 		}
 	}
