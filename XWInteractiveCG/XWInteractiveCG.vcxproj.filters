@@ -104,6 +104,12 @@
     <None Include="Data\PokeBall_FS.glsl">
       <Filter>Source Files\Data\Shaders</Filter>
     </None>
+    <None Include="Data\TilingBG_FS.glsl">
+      <Filter>Source Files\Data\Shaders</Filter>
+    </None>
+    <None Include="Data\TilingBG_VS.glsl">
+      <Filter>Source Files\Data\Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Programs\cyCore.h">

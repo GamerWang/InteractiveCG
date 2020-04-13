@@ -7,6 +7,8 @@
 //-------------------------------------------------------------------------------
 
 #include "cyMatrix.h"
+#include "cyGL.h"
+#include "xwMaterial.h"
 
 //-------------------------------------------------------------------------------
 
@@ -123,6 +125,19 @@ void TextureIDConverter(int id, GLint& outID) {
 	default:
 		break;
 	}
+}
+
+//-------------------------------------------------------------------------------
+
+void SetTexture2D(cyGLTexture2D* targetTex, Material::Texture readTex) {
+	targetTex->Initialize();
+	targetTex->SetFilteringMode(GL_LINEAR, GL_LINEAR);
+	targetTex->SetWrappingMode(GL_REPEAT, GL_REPEAT);
+	targetTex->SetMaxAnisotropy();
+	targetTex->SetImage(
+		GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE,
+		readTex.textureData.data(), readTex.width, readTex.height);
+	targetTex->BuildMipmaps();
 }
 
 //-------------------------------------------------------------------------------

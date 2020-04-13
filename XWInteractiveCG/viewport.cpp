@@ -98,6 +98,10 @@ char cubemapVertShaderPath[30] = "Data\\SV_Cubemap.glsl";
 char cubemapFragShaderPath[30] = "Data\\SF_Cubemap.glsl";
 GLSLProgram* cubemapProgram;
 
+char backgroundVertShaderPath[30] = "Data\\TilingBG_VS.glsl";
+char backgroundFragShaderPath[30] = "Data\\TilingBG_FS.glsl";
+GLSLProgram* backgroundProgram;
+
 char pointLightDepthVertShaderPath[40] = "Data\\PointShadowDepth_VS.glsl";
 char pointLightDepthFragShaderPath[40] = "Data\\PointShadowDepth_FS.glsl";
 char pointLightDepthGeomShaderPath[40] = "Data\\PointShadowDepth_GS.glsl";
@@ -180,9 +184,9 @@ GLuint envCubeVertexArrayObjectID;
 GLuint envVertexBufferID;
 GLuint envIndexBufferID;
 
-GLuint TextureVertexArrayObjectID;
-GLuint TexturePlaneVertexBufferID;
-GLuint TexturePlaneIndexBufferID;
+GLuint PlaneVAO;
+GLuint PlaneVertexBufferID;
+GLuint PlaneIndexBufferID;
 
 GLuint UBOMatrices;
 GLuint UBOLights;
@@ -229,6 +233,7 @@ GLTextureCubeMap* envCubeMapTexture;
 Material* baseObjectMaterial;
 cyGLTexture2D* baseObjectDiffuse;
 cyGLTexture2D* baseObjectSpecular;
+cyGLTexture2D* backgroundTex;
 Vec3f baseObjectColor;
 Vec3f baseObjectDiffuseColor;
 Vec3f baseObjectSpecularColor;
@@ -659,7 +664,7 @@ void GlutDisplay() {
 
 					pointLightDepthProgram->SetUniformMatrix4("model", &objectToWorldMatrix.cell[0]);
 
-					glBindVertexArray(TextureVertexArrayObjectID);
+					glBindVertexArray(PlaneVAO);
 					glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 				}
 			}
@@ -671,12 +676,12 @@ void GlutDisplay() {
 	// render scene as normal
 	glViewport(0, 0, screenSize[0], screenSize[1]);
 	glDepthMask(GL_TRUE);
-	glEnable(GL_DEPTH_TEST);
 	//glClearColor(0, 0, 0, 1.0f);
 	//glClearColor(.071f, .0625f, .165f, 1.0f);
 	glClearColor(0.1796875, 0.8125, 1.f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	
+
+	glEnable(GL_DEPTH_TEST);
 	// send worldToClamp to uniform buffer object
 	{
 		Matrix4f worldToViewMatrix =
@@ -744,6 +749,23 @@ void GlutDisplay() {
 	}
 #endif // enable_environment_cube
 
+	// render tiling background
+	{
+		glDepthMask(GL_FALSE);
+
+		glBindVertexArray(PlaneVAO);
+		backgroundProgram->Bind();
+
+		backgroundTex->Bind();
+		GLuint texID = backgroundTex->GetID();
+		glActiveTexture(GL_TEXTURE0+texID);
+		backgroundProgram->SetUniform1("bgTex", 1, &texID);
+
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+	}
+
+	glDepthMask(GL_TRUE);
+
 	// render plane object
 	{
 		Matrix4f objectToWorldMatrix =
@@ -772,7 +794,7 @@ void GlutDisplay() {
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubemap);
 
-		glBindVertexArray(TextureVertexArrayObjectID);
+		glBindVertexArray(PlaneVAO);
 		switch (renderMode)
 		{
 		case XW_RENDER_LINELOOP:
@@ -1154,26 +1176,15 @@ void SendDataToOpenGL(char objName[]) {
 		{
 			Material::Texture diffuseTexture = Material::Texture("toonWater.png");
 			baseObjectDiffuse = new cyGLTexture2D();
-			baseObjectDiffuse->Initialize();
-			baseObjectDiffuse->SetFilteringMode(GL_LINEAR, GL_LINEAR);
-			baseObjectDiffuse->SetWrappingMode(GL_REPEAT, GL_REPEAT);
-			baseObjectDiffuse->SetMaxAnisotropy();
-			baseObjectDiffuse->SetImage(
-				GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE,
-				diffuseTexture.textureData.data(), diffuseTexture.width, diffuseTexture.height);
-			baseObjectDiffuse->BuildMipmaps();
-
+			SetTexture2D(baseObjectDiffuse, diffuseTexture);
 
 			Material::Texture specularTexture = Material::Texture("brick-specular.png");
 			baseObjectSpecular = new cyGLTexture2D();
-			baseObjectSpecular->Initialize();
-			baseObjectSpecular->SetFilteringMode(GL_LINEAR, GL_LINEAR);
-			baseObjectSpecular->SetWrappingMode(GL_REPEAT, GL_REPEAT);
-			baseObjectSpecular->SetMaxAnisotropy();
-			baseObjectSpecular->SetImage(
-				GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE,
-				specularTexture.textureData.data(), specularTexture.width, specularTexture.height);
-			baseObjectSpecular->BuildMipmaps();
+			SetTexture2D(baseObjectSpecular, specularTexture);
+
+			Material::Texture tilingBlueTex = Material::Texture("TileBG_Blue.png");
+			backgroundTex = new cyGLTexture2D();
+			SetTexture2D(backgroundTex, tilingBlueTex);
 
 			glBindTexture(GL_TEXTURE_2D, 0);
 		}
@@ -1275,28 +1286,28 @@ void SendDataToOpenGL(char objName[]) {
 	// Plane data
 	{
 		Plane plane;
-		glGenBuffers(1, &TexturePlaneVertexBufferID);
-		glBindBuffer(GL_ARRAY_BUFFER, TexturePlaneVertexBufferID);
+		glGenBuffers(1, &PlaneVertexBufferID);
+		glBindBuffer(GL_ARRAY_BUFFER, PlaneVertexBufferID);
 		glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(Vertex), plane.GetVertices(), GL_STATIC_DRAW);
 
-		glGenBuffers(1, &TexturePlaneIndexBufferID);
-		glBindBuffer(GL_ARRAY_BUFFER, TexturePlaneIndexBufferID);
+		glGenBuffers(1, &PlaneIndexBufferID);
+		glBindBuffer(GL_ARRAY_BUFFER, PlaneIndexBufferID);
 		glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(unsigned int), plane.GetIndices(), GL_STATIC_DRAW);
 	
-		glGenVertexArrays(1, &TextureVertexArrayObjectID);
-		glBindVertexArray(TextureVertexArrayObjectID);
+		glGenVertexArrays(1, &PlaneVAO);
+		glBindVertexArray(PlaneVAO);
 		glEnableVertexAttribArray(0);
 		glEnableVertexAttribArray(1);
-		glBindBuffer(GL_ARRAY_BUFFER, TexturePlaneVertexBufferID);
+		glBindBuffer(GL_ARRAY_BUFFER, PlaneVertexBufferID);
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
 		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (char*)(sizeof(float) * 6));
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, TexturePlaneIndexBufferID);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, PlaneIndexBufferID);
 
 		glBindVertexArray(0);	
 	}
 
-	baseObjectDiffuse->Bind(0);
-	baseObjectSpecular->Bind(1);
+	baseObjectDiffuse->Bind();
+	baseObjectSpecular->Bind();
 #ifdef enable_env_cube
 	envCubeMapTexture->Bind(2);
 #endif // enable_env_cube
@@ -1318,6 +1329,7 @@ void InstallTeapotSceneShaders() {
 #ifdef enable_env_cube
 	cubemapProgram = new GLSLProgram();
 #endif // enable_env_cube
+	backgroundProgram = new GLSLProgram();
 
 	CompileShaders();
 
@@ -1359,6 +1371,27 @@ void CompileShaders() {
 		cubemapProgram->SetUniform("skybox", 2);
 	}
 #endif // enable_env_cube
+
+	// background shader
+	{
+		if (vertexShader == NULL) {
+			vertexShader = new GLSLShader();
+		}
+		if (fragmentShader == NULL) {
+			fragmentShader = new GLSLShader();
+		}
+		if (!vertexShader->CompileFile(backgroundVertShaderPath, GL_VERTEX_SHADER)) {
+			return;
+		}
+		if (!fragmentShader->CompileFile(backgroundFragShaderPath, GL_FRAGMENT_SHADER)) {
+			return;
+		}
+
+		backgroundProgram->CreateProgram();
+		backgroundProgram->AttachShader(vertexShader->GetID());
+		backgroundProgram->AttachShader(fragmentShader->GetID());
+		backgroundProgram->Link();
+	}
 
 	// target object shader
 	{
