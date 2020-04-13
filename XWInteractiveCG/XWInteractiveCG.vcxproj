@@ -34,7 +34,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
@@ -165,6 +165,8 @@ xcopy $(SolutionDir)MiddleWare\Assimp\bin\Release\Win32\assimp-vc141-mt.dll $(ta
     <None Include="Data\PointShadowDepth_FS.glsl" />
     <None Include="Data\PointShadowDepth_GS.glsl" />
     <None Include="Data\PointShadowDepth_VS.glsl" />
+    <None Include="Data\PokeBall_FS.glsl" />
+    <None Include="Data\PokeBall_VS.glsl" />
     <None Include="Data\SF_DiffPlane.glsl" />
     <None Include="Data\SF_TargetObj.glsl" />
     <None Include="Data\SF_Cubemap.glsl" />

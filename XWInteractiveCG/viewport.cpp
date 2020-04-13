@@ -62,7 +62,10 @@ enum RenderMode {
 
 //#define enable_env_cube
 //#define plane_reflective
-#define plane_diffuse
+#define plane_diffuse 0
+
+#define tScale_Uniform 0
+//#define tScale_NUniform 0
 
 //-------------------------------------------------------------------------------
 
@@ -82,6 +85,10 @@ char targetOutlineVertShaderPath[30] = "Data\\TargetObjOutline_VS.glsl";
 char targetOutlineGeomShaderPath[30] = "Data\\TargetObjOutline_GS.glsl";
 char targetOutlineFragShaderPath[30] = "Data\\TargetObjOutline_FS.glsl";
 GLSLProgram* targetOutlineProgram;
+
+char pokeballVertShaderPath[30] = "Data\\PokeBall_VS.glsl";
+char pokeballFragShaderPath[30] = "Data\\PokeBall_FS.glsl";
+GLSLProgram* pokeBallProgram;
 
 char RTextureVertShaderPath[30] = "Data\\SV_RTPlane.glsl";
 char RTextureFragShaderPath[30] = "Data\\SF_RTPlane.glsl";
@@ -109,6 +116,9 @@ GLSLProgram* planeProgram;
 //-------------------------------------------------------------------------------
 
 Model* mainModel;
+Model* pBallTopModel;
+Model* pBallLockModel;
+Model* pBallBottomModel;
 
 //-------------------------------------------------------------------------------
 
@@ -263,7 +273,7 @@ void GlutReshapeWindow(int width, int height);
 
 void SendDataToOpenGL(char objName[]);
 void InstallTeapotSceneShaders();
-void CompileTeapotSceneShaders();
+void CompileShaders();
 
 //-------------------------------------------------------------------------------
 
@@ -289,11 +299,19 @@ void ShowViewport(int argc, char* argv[]) {
 
 	// Magikarp settings
 	{
+#ifdef tScale_Uniform
+		baseObjectPosition = Vec3f(0, -23, 0);
+		baseObjectRotation = Vec3f(Pi<float>() / 2, -Pi<float>() / 3, 0);
+		baseObjectScale = Vec3f(.3f, .3f, .3f);
+#endif
+
+#ifdef tScale_NUniform
 		baseObjectPosition = Vec3f(0, -23, 0);
 		baseObjectRotation = Vec3f(0, -Pi<float>() / 3, 0);
 		baseObjectScale = Vec3f(.6f, .6f, .6f);
+#endif
 
-		planePosition = Vec3f(0, -25, 0);
+		planePosition = Vec3f(0, -45, 0);
 		baseCamera->SetPosition(Vec3f(0, 0, 100));
 	}
 
@@ -339,7 +357,7 @@ void ShowViewport(int argc, char* argv[]) {
 	ambientLight.SetIntensity(.15f);
 	pointLight0.SetPosition(Vec3f(0, 0, 80));
 	pointLight0.SetIntensity(Vec3f(.7f));
-	pointLight0.SetRotation(Vec2f(Pi<float>() * (-40.f/180.f), Pi<float>() * (35.f / 180.f)));
+	pointLight0.SetRotation(Vec2f(Pi<float>() * (-50.f/180.f), Pi<float>() * (30.f / 180.f)));
 
 	renderMode = XW_RENDER_TRIANGLES;
 
@@ -372,11 +390,11 @@ void ShowViewport(int argc, char* argv[]) {
 		SendDataToOpenGL(argv[1]);
 	}
 
-	if (!targetObject->IsBoundBoxReady()) {
-		targetObject->ComputeBoundingBox();
-	}
-	baseObjectCenter = targetObject->GetBoundMax() + targetObject->GetBoundMin();
-	baseObjectCenter /= 2;
+	//if (!targetObject->IsBoundBoxReady()) {
+	//	targetObject->ComputeBoundingBox();
+	//}
+	//baseObjectCenter = targetObject->GetBoundMax() + targetObject->GetBoundMin();
+	//baseObjectCenter /= 2;
 
 	// initialize reflection render texture buffer
 	{
@@ -417,8 +435,10 @@ void ShowViewport(int argc, char* argv[]) {
 	}
 
 	// read model
-	mainModel = new Model("Data/MagikarpM.fbx");
-	//mainModel = new Model("Data/Fuka_my.fbx");
+	mainModel = new Model("Data/Magikarp_UScale.fbx");
+	pBallTopModel = new Model("Data/Pokeball_top.fbx");
+	pBallLockModel = new Model("Data/Pokeball_Lock.fbx");
+	pBallBottomModel = new Model("Data/Pokeball_Bottom.fbx");
 
 	// install shaders to opengl
 	InstallTeapotSceneShaders();
@@ -459,6 +479,9 @@ void ShowViewport(int argc, char* argv[]) {
 			GLuint uniformBlockIndexPlaneFrag = glGetUniformBlockIndex(planeProgram->GetID(), "Lights");
 			glUniformBlockBinding(planeProgram->GetID(), uniformBlockIndexPlaneFrag, 1);
 #endif // plane_diffuse
+
+			GLuint uniformBlockIndexPBFrag = glGetUniformBlockIndex(pokeBallProgram->GetID(), "Lights");
+			glUniformBlockBinding(pokeBallProgram->GetID(), uniformBlockIndexBaseFrag, 1);
 
 			glGenBuffers(1, &UBOLights);
 			glBindBuffer(GL_UNIFORM_BUFFER, UBOLights);
@@ -650,8 +673,8 @@ void GlutDisplay() {
 	glDepthMask(GL_TRUE);
 	glEnable(GL_DEPTH_TEST);
 	//glClearColor(0, 0, 0, 1.0f);
-	glClearColor(.071f, .0625f, .165f, 1.0f);
-	//glClearColor(0.1796875, 0.8125, 1.f, 1.0f);
+	//glClearColor(.071f, .0625f, .165f, 1.0f);
+	glClearColor(0.1796875, 0.8125, 1.f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
 	// send worldToClamp to uniform buffer object
@@ -679,6 +702,9 @@ void GlutDisplay() {
 		// send outline shader matrices
 		targetOutlineProgram->SetUniformMatrix4("worldToView", &worldToViewMatrix.cell[0]);
 		targetOutlineProgram->SetUniformMatrix4("viewToClip", &viewToProjectionMatrix.cell[0]);
+
+		pokeBallProgram->SetUniformMatrix4("worldToView", &worldToViewMatrix.cell[0]);
+		pokeBallProgram->SetUniformMatrix4("viewToClip", &viewToProjectionMatrix.cell[0]);
 	}
 
 	// send point light info to uniform buffer object
@@ -750,11 +776,11 @@ void GlutDisplay() {
 		switch (renderMode)
 		{
 		case XW_RENDER_LINELOOP:
-			glDrawElements(GL_LINE_LOOP, 6, GL_UNSIGNED_INT, 0);
+			//glDrawElements(GL_LINE_LOOP, 6, GL_UNSIGNED_INT, 0);
 			break;
 		case XW_RENDER_TRIANGLES:
 		default:
-			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+			//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 			break;
 		}
 	}
@@ -798,16 +824,51 @@ void GlutDisplay() {
 
 		mainModel->Draw(targetObjectProgram);
 		
-		// Draw outlines
-		targetOutlineProgram->Bind();
-		
 		targetOutlineProgram->SetUniformMatrix4("objectToWorld", &objectToWorldMatrix.cell[0]);
 		targetOutlineProgram->SetUniformMatrix3("objNmlToWorld", &objectNormalToWorldMatrix.cell[0]);
 
+		pokeBallProgram->SetUniformMatrix4("objectToWorld", &objectToWorldMatrix.cell[0]);
+		pokeBallProgram->SetUniformMatrix3("objNmlToWorld", &objectNormalToWorldMatrix.cell[0]);
+		pokeBallProgram->SetUniform3("cameraPosition", 1, baseCamera->GetPosition().Elements());
+		
+		// Draw outlines
+		targetOutlineProgram->Bind();
+
 		glCullFace(GL_FRONT);
+
+		Vec3f tOutlineClr = Vec3f(.8f, .4f, .3f);
+		//Vec3f tOutlineClr = Vec3f(1.f, .9f, .9f);
+		Vec3f bOutlineClr = Vec3f(.0f, .0f, .0f);
+
+		targetOutlineProgram->SetUniform3("color", 1, tOutlineClr.Elements());
 		mainModel->Draw(targetOutlineProgram);
 
-		glCullFace(GL_BACK);
+		targetOutlineProgram->SetUniform3("color", 1, bOutlineClr.Elements());
+		pBallTopModel->Draw(targetOutlineProgram);
+		pBallBottomModel->Draw(targetOutlineProgram);
+
+		// Draw pokeball
+		pokeBallProgram->Bind();
+
+		Vec3f pbTopClr = Vec3f(.86, .0, .0);
+		Vec3f pbLckClr = Vec3f(.0, .0, .0);
+		Vec3f pbBotClr = Vec3f(.8, .8, .8);
+
+		Vec3f yinClr = Vec3f(.3f, .3f, .5f);
+
+		pokeBallProgram->SetUniform3("color", 1, pbTopClr.Elements());
+		pokeBallProgram->SetUniform3("yinClr", 1, Vec3f(1).Elements());
+		pBallTopModel->Draw(pokeBallProgram);
+
+		glDisable(GL_CULL_FACE);
+
+		pokeBallProgram->SetUniform3("color", 1, pbLckClr.Elements());
+		pokeBallProgram->SetUniform3("yinClr", 1, Vec3f(0).Elements());
+		pBallLockModel->Draw(pokeBallProgram);
+		
+		pokeBallProgram->SetUniform3("color", 1, pbBotClr.Elements());
+		pokeBallProgram->SetUniform3("yinClr", 1, yinClr.Elements());
+		pBallBottomModel->Draw(pokeBallProgram);
 	}
 
 	// render light object temp
@@ -849,22 +910,20 @@ void GlutDisplay() {
 		}
 	}
 
-
-
 	glutSwapBuffers();
 }
 
 //-------------------------------------------------------------------------------
 
 void GlutIdle() {
-	clock_t t;
-	t = clock();
+	//clock_t t;
+	//t = clock();
 
-	float tFrac = t / 1000.0f;
+	//float tFrac = t / 1000.0f;
 
-	baseObjectColor.x = .5f * sinf(tFrac) + .5f;
-	baseObjectColor.y = .5f * cosf(2 * tFrac - 2) + .5f;
-	baseObjectColor.z = .5f * sinf(-3 * tFrac + 1) + .5f;
+	//baseObjectColor.x = .5f * sinf(tFrac) + .5f;
+	//baseObjectColor.y = .5f * cosf(2 * tFrac - 2) + .5f;
+	//baseObjectColor.z = .5f * sinf(-3 * tFrac + 1) + .5f;
 
 	glutPostRedisplay();
 }
@@ -913,7 +972,7 @@ void GlutSpecialKey(int key, int x, int y) {
 		break;
 	case GLUT_KEY_F6:
 		printf("Recompile shaders\n");
-		CompileTeapotSceneShaders();
+		CompileShaders();
 		break;
 	case GLUT_KEY_CTRL_L:
 	case GLUT_KEY_CTRL_R:
@@ -1249,20 +1308,18 @@ void InstallTeapotSceneShaders() {
 	fragmentShader = new GLSLShader();
 	geometryShader = new GLSLShader();
 
+	// programs
 	targetObjectProgram = new GLSLProgram();
-
 	targetOutlineProgram = new GLSLProgram();
+	pokeBallProgram = new GLSLProgram();
+	planeProgram = new GLSLProgram();
+	pointLightDepthProgram = new GLSLProgram();
 
 #ifdef enable_env_cube
 	cubemapProgram = new GLSLProgram();
 #endif // enable_env_cube
 
-	planeProgram = new GLSLProgram();
-
-	pointLightDepthProgram = new GLSLProgram();
-
-	CompileTeapotSceneShaders();
-
+	CompileShaders();
 
 	targetObjectProgram->RegisterUniforms(targetUniformNames);
 
@@ -1275,7 +1332,7 @@ void InstallTeapotSceneShaders() {
 
 //-------------------------------------------------------------------------------
 
-void CompileTeapotSceneShaders() {
+void CompileShaders() {
 	// base scene shaders
 #ifdef enable_env_cube
 	// env cubemap shader
@@ -1323,10 +1380,10 @@ void CompileTeapotSceneShaders() {
 		targetObjectProgram->AttachShader(fragmentShader->GetID());
 		targetObjectProgram->Link();
 
-		targetObjectProgram->SetUniform("brdfMode", 0);
-		targetObjectProgram->SetUniform("specularTexture", 1);
+		//targetObjectProgram->SetUniform("brdfMode", 0);
+		//targetObjectProgram->SetUniform("specularTexture", 1);
 		targetObjectProgram->SetUniform("depthMap", 3);
-		targetObjectProgram->SetUniform("skybox", 2);
+		//targetObjectProgram->SetUniform("skybox", 2);
 	}
 
 	// target outline shaders
@@ -1355,6 +1412,28 @@ void CompileTeapotSceneShaders() {
 		targetOutlineProgram->AttachShader(fragmentShader->GetID());
 		targetOutlineProgram->AttachShader(geometryShader->GetID());
 		targetOutlineProgram->Link();
+	}
+
+	// pokeball shaders
+	{
+		if (vertexShader == NULL) {
+			vertexShader = new GLSLShader();
+		}
+		if (fragmentShader == NULL) {
+			fragmentShader = new GLSLShader();
+		}
+		if (!vertexShader->CompileFile(pokeballVertShaderPath, GL_VERTEX_SHADER)) {
+			return;
+		}
+		if (!fragmentShader->CompileFile(pokeballFragShaderPath, GL_FRAGMENT_SHADER)) {
+			return;
+		}
+
+
+		pokeBallProgram->CreateProgram();
+		pokeBallProgram->AttachShader(vertexShader->GetID());
+		pokeBallProgram->AttachShader(fragmentShader->GetID());
+		pokeBallProgram->Link();
 	}
 
 	// reflective plane shader

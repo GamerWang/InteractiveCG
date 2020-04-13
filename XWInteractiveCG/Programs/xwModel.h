@@ -32,6 +32,7 @@ using namespace cy;
 //#define MODEL_USE_FUKA 0
 
 #define MODEL_USE_MAGI 0
+//#define READ_TANGNET 0
 
 //-------------------------------------------------------------------------------
 
@@ -120,6 +121,8 @@ private:
 			}
 			else
 				vertex.TexCoords = Vec2f(.0f, .0f);
+
+#ifdef READ_TANGENT
 			// tangent
 			vertex.Tangent = Vec3f(
 				mesh->mTangents[i].x,
@@ -129,7 +132,9 @@ private:
 			vertex.Bitangent = Vec3f(
 				mesh->mBitangents[i].x,
 				mesh->mBitangents[i].y,
-				mesh->mBitangents[i].z);
+				mesh->mBitangents[i].z);	
+#endif // READ_TANGENT
+
 			vertices.push_back(vertex);
 		}
 		// walk through faces

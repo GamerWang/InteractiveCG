@@ -18,12 +18,19 @@ using namespace cy;
 
 //-------------------------------------------------------------------------------
 
+//#define READ_TANGENT 0
+
+//-------------------------------------------------------------------------------
+
 struct xwVertex {
 	Vec3f Position;
 	Vec3f Normal;
 	Vec2f TexCoords;
+#ifdef READ_TANGENT
 	Vec3f Tangent;
 	Vec3f Bitangent;
+#endif
+
 };
 
 struct Texture {
@@ -106,6 +113,7 @@ private:
 		glEnableVertexAttribArray(2);
 		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 
 			sizeof(xwVertex), (void*)offsetof(xwVertex, TexCoords));
+#ifdef READ_TANGENT
 		// vertex tangent
 		glEnableVertexAttribArray(3);
 		glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 
@@ -114,6 +122,7 @@ private:
 		glEnableVertexAttribArray(4);
 		glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 
 			sizeof(xwVertex), (void*)offsetof(xwVertex, Bitangent));
+#endif // READ_TANGENT
 
 		glBindVertexArray(0);
 	}

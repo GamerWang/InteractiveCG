@@ -11,7 +11,7 @@ uniform mat4 viewToClip;
 void main()
 {
 	float outlineWidth = .1f;
-	float zOffset = .005f;
+	float zOffset = .0005f;
 
 	for(int i = 0; i < 3; i++){
 		vec4 p = gl_in[i].gl_Position;
