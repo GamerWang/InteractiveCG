@@ -70,6 +70,7 @@ enum RenderMode {
 //-------------------------------------------------------------------------------
 
 GLRenderTexture2D* reflectionFrameBuffer;
+GLRenderTexture2D* postProcess1FrameBuffer;
 
 //-------------------------------------------------------------------------------
 
@@ -116,6 +117,10 @@ char planeVertShaderPath[30] = "Data\\SV_DiffPlane.glsl";
 char planeFragShaderPath[30] = "Data\\SF_DiffPlane.glsl";
 #endif // plane_diffuse
 GLSLProgram* planeProgram;
+
+char screenQuadVertShaderPath[30] = "Data\\ScreenShader_VS.glsl";
+char screenQuadFragShaderPath[30] = "Data\\ScreenShader_FS.glsl";
+GLSLProgram* screenQuadProgram;
 
 //-------------------------------------------------------------------------------
 
@@ -410,6 +415,15 @@ void ShowViewport(int argc, char* argv[]) {
 		reflectionFrameBuffer->SetTextureMaxAnisotropy();
 	}
 
+	// initialize color buffer for 
+	{
+		postProcess1FrameBuffer = new GLRenderTexture2D();
+		postProcess1FrameBuffer->Initialize(true, 3, 800, 800);
+		postProcess1FrameBuffer->BuildTextureMipmaps();
+		postProcess1FrameBuffer->SetTextureFilteringMode(GL_LINEAR, GL_LINEAR);
+		postProcess1FrameBuffer->SetTextureMaxAnisotropy();
+	}
+
 	// initialize depth map frame buffer
 	{
 		glGenFramebuffers(1, &depthMapFBO);
@@ -674,6 +688,9 @@ void GlutDisplay() {
 	}
 
 	// render scene as normal
+	// render scene to postprocess framebuffer
+	postProcess1FrameBuffer->Bind();
+	//glBindFramebuffer(GL_FRAMEBUFFER, postProcess1FrameBuffer->GetID());
 	glViewport(0, 0, screenSize[0], screenSize[1]);
 	glDepthMask(GL_TRUE);
 	//glClearColor(0, 0, 0, 1.0f);
@@ -788,13 +805,16 @@ void GlutDisplay() {
 		planeProgram->SetUniform3("worldNormal", 1, worldNormal.Elements());
 		planeProgram->SetUniform1("far_plane", 1, &depthFar);
 
+
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, baseObjectDiffuse->GetID());
 
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubemap);
 
+		//screenQuadProgram->Bind();
 		glBindVertexArray(PlaneVAO);
+		//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		switch (renderMode)
 		{
 		case XW_RENDER_LINELOOP:
@@ -930,6 +950,25 @@ void GlutDisplay() {
 			//glDrawElements(GL_TRIANGLES, baseNumIndices, GL_UNSIGNED_INT, 0);
 			break;
 		}
+	}
+
+	// render post process quad
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glClearColor(.0f, 1.f, 1.f, 1.f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glDisable(GL_CULL_FACE);
+
+		screenQuadProgram->Bind();
+		glBindVertexArray(PlaneVAO);
+		
+		postProcess1FrameBuffer->BindTexture();
+		GLuint texID = postProcess1FrameBuffer->GetTextureID();
+
+		glActiveTexture(GL_TEXTURE0 + texID);
+		screenQuadProgram->SetUniform1("screenTexture", 1, &texID);
+
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	}
 
 	glutSwapBuffers();
@@ -1331,6 +1370,8 @@ void InstallTeapotSceneShaders() {
 #endif // enable_env_cube
 	backgroundProgram = new GLSLProgram();
 
+	screenQuadProgram = new GLSLProgram();
+
 	CompileShaders();
 
 	targetObjectProgram->RegisterUniforms(targetUniformNames);
@@ -1521,6 +1562,29 @@ void CompileShaders() {
 		pointLightDepthProgram->AttachShader(fragmentShader->GetID());
 		pointLightDepthProgram->Link();
 		pointLightDepthProgram->SetUniform1("far_plane", 1, &depthFar);
+	}
+
+	// screen quad shader
+	{
+		if (vertexShader == NULL) {
+			vertexShader = new GLSLShader();
+		}
+		if (fragmentShader == NULL) {
+			fragmentShader = new GLSLShader();
+		}
+		if (!vertexShader->CompileFile(screenQuadVertShaderPath, GL_VERTEX_SHADER)) {
+			return;
+		}
+		if (!fragmentShader->CompileFile(screenQuadFragShaderPath, GL_FRAGMENT_SHADER)) {
+			return;
+		}
+
+		screenQuadProgram->CreateProgram();
+		screenQuadProgram->AttachShader(vertexShader->GetID());
+		screenQuadProgram->AttachShader(fragmentShader->GetID());
+		screenQuadProgram->Link();
+		Vec2f texelSize = Vec2f(2, 2) / Vec2f(screenSize[0], screenSize[1]);
+		screenQuadProgram->SetUniform2("texelSize", 1, texelSize.Elements());
 	}
 
 	vertexShader->Delete();

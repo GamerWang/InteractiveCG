@@ -167,6 +167,8 @@ xcopy $(SolutionDir)MiddleWare\Assimp\bin\Release\Win32\assimp-vc141-mt.dll $(ta
     <None Include="Data\PointShadowDepth_VS.glsl" />
     <None Include="Data\PokeBall_FS.glsl" />
     <None Include="Data\PokeBall_VS.glsl" />
+    <None Include="Data\ScreenShader_FS.glsl" />
+    <None Include="Data\ScreenShader_VS.glsl" />
     <None Include="Data\SF_DiffPlane.glsl" />
     <None Include="Data\SF_TargetObj.glsl" />
     <None Include="Data\SF_Cubemap.glsl" />
